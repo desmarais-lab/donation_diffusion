@@ -1,4 +1,5 @@
 library(tidyverse)
+library(reshape2)
 
 source('plot_theme.R')
 
@@ -46,7 +47,7 @@ ggplot(filter(pacs, variable %in% c("total_donations", 'average_donations',
     ylab('Proportion') + xlab('Ammount $') +
     plot_theme
 ggsave('paper/figures/donation_distributions.png', width = p_width, 
-       height = 0.5 * p_width)
+       height = 0.33 * p_width)
 
 # Cumulative distribution donation target variables
 ggplot(filter(pacs, variable %in% c("prop_donation_democrat", 
@@ -57,8 +58,20 @@ ggplot(filter(pacs, variable %in% c("prop_donation_democrat",
        aes(x = value)) +
     #geom_histogram(aes(y = (..count..)/sum(..count..)), color = 'white') +
     stat_ecdf(geom = "step") + 
-    facet_wrap(~variable, nrow=1, scales = "free") +
+    facet_wrap(~variable, scales = "free") +
     ylab('Proportion') +
-    theme_bw()
+    plot_theme
 ggsave('paper/figures/donation_targets_distribution.png', 
-       width = p_width, height = 0.5 * p_width)
+       width = p_width, height = p_width)
+
+multi_give <- group_by(df, CMTE_ID, CAND_ID) %>%
+    summarize(n_donations = n()) %>%
+    arrange(desc(n_donations))
+
+ggplot(multi_give, aes(x = n_donations)) +
+    stat_ecdf(geom = "step") + 
+    scale_x_log10(breaks = c(1, 10, 100, 1e3, 1e4, 1e5)) +
+    ylab("Proportion") + xlab("# of donations to same candidate") +
+    plot_theme
+ggsave('paper/figures/donations_to_same_candidate.png', 
+       width = p_width, height = p_width)
