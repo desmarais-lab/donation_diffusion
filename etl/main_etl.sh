@@ -1,53 +1,43 @@
+# For 2016 (16) and 2018 (18) download the pac_donation and candidate master files 
+# (+ headers) merge them with their respective headers, join on candidate id and 
+# save in new file
+
 # Committee header file
 wget http://classic.fec.gov/finance/disclosure/metadata/pas2_header_file.csv
 # Candidate header file
 wget http://classic.fec.gov/finance/disclosure/metadata/cn_header_file.csv
 
-# Donation data 
+for i in 16 18
+do
+    # Download donation archive
+    ARCHIVE_NAME=pas2${i}.zip
+    ARCHIVE_URL=ftp://ftp.fec.gov/FEC/20${i}/$ARCHIVE_NAME
+    wget $ARCHIVE_URL
+    unzip $ARCHIVE_NAME
+    rm $ARCHIVE_NAME
 
-## 2016
+    # Parse pipe separated, merge with header and write to csv
+    python psv_to_csv.py itpas2.txt pas2_header_file.csv \
+        20${i}_pac_contributions.csv
+    rm itpas2.txt
 
-### Donation data
-wget ftp://ftp.fec.gov/FEC/2016/pas216.zip
-unzip pas216.zip
-rm pas216.zip
-python psv_to_csv.py itpas2.txt pas2_header_file.csv 2016_pac_contributions.csv
-rm itpas2.txt
+    # Download candidate archive
+    ARCHIVE_NAME=cn${i}.zip
+    ARCHIVE_URL=ftp://ftp.fec.gov/FEC/20${i}/$ARCHIVE_NAME
+    wget $ARCHIVE_URL
+    unzip $ARCHIVE_NAME
+    rm $ARCHIVE_NAME
 
-### Candidate data
-wget ftp://ftp.fec.gov/FEC/2016/cn16.zip
-unzip cn16.zip
-rm cn16.zip
-python psv_to_csv.py cn.txt cn_header_file.csv 2016_candidates.csv
-rm cn.txt
+    # Parse pipe separated, merge with header and write to csv
+    python psv_to_csv.py cn.txt cn_header_file.csv 20${i}_candidates.csv
+    rm cn.txt
+    
+    # Join donation and candidate data
+    python join_donation_candidate.py 20${i}_pac_contributions.csv \
+        20${i}_candidates.csv 20${i}_pac_contributions.csv
 
-### Join donation and candidate data
-python join_donation_candidate.py 2016_pac_contributions.csv \
-    2016_candidates.csv 2016_pac_contributions.csv
-
-rm 2016_candidates.csv
-
-## 2018
-
-### Donation Data
-wget ftp://ftp.fec.gov/FEC/2018/pas218.zip
-unzip pas218.zip
-rm pas218.zip
-python psv_to_csv.py itpas2.txt pas2_header_file.csv 2018_pac_contributions.csv
-rm itpas2.txt
-
-### Candidate data
-wget ftp://ftp.fec.gov/FEC/2018/cn18.zip
-unzip cn18.zip
-rm cn18.zip
-python psv_to_csv.py cn.txt cn_header_file.csv 2018_candidates.csv
-rm cn.txt
-
-### Join donation and candidate data
-python join_donation_candidate.py 2018_pac_contributions.csv \
-    2018_candidates.csv 2018_pac_contributions.csv
-
-rm 2018_candidates.csv
+    rm 20${i}_candidates.csv
+done
 
 # Concatenate the datasets
 python concat_csvs.py *_pac_contributions.csv ../data/pac_contributions.csv
