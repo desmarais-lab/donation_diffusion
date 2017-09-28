@@ -11,12 +11,10 @@ parse_date <- function(x) {
     return(as.Date(paste(year, month, day, sep = '/')))
 }
 
-df <- read_csv('data/2016_PAC_CONTRIBUTIONS.csv') %>%
-    mutate(date = as.integer(parse_date(DONOR_DATE))) %>%
+df <- read_csv('../data/pac_contributions.csv') %>%
+    mutate(date = as.integer(parse_date(TRANSACTION_DT))) %>%
     group_by(CMTE_ID, CAND_ID) %>%
     summarize(date = min(date))
-
-
 
 cascades <- as_cascade_long(df, cascade_node_name = 'CMTE_ID', 
                             event_time = 'date', 
