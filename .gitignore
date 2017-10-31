@@ -2,3 +2,4 @@ api_key.py
 __pycache__/
 data/
 data
+db_credentials.py
