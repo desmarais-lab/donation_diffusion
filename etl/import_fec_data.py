@@ -92,12 +92,17 @@ def get_fec_data_dictionary(table_name):
 
     return variables
 
+class InvalidLineError(Exception):
+    def __init__(self,*args,**kwargs):
+        Exception.__init__(self,*args,**kwargs)
+
 def parse_fec_data_line(line, data_dict):
     line = line.strip('\n')
     n_vars = len(data_dict)
     fields = line.split('|')
     if len(fields) != n_vars:
-        raise ValueError('Invalid line')
+        raise InvalidlineError()
+
     
     out = [None]*n_vars
     # Convert types right now only 3: Text, decimal and 
@@ -110,10 +115,11 @@ def parse_fec_data_line(line, data_dict):
         elif 'DECIMAL' in dtype:
             out[position] = float(string_value)
         elif 'DATE' in dtype:
-            if string_value == '':
-                out[position] = None
-            else:
+            try:
                 out[position] = datetime.strptime(string_value, '%m%d%Y')
+            except ValueError:
+                out[position] = None
+
         else:
             raise ValueError(f'Unexpected dtype: {dtype}')
 
@@ -133,7 +139,7 @@ if __name__ == "__main__":
               ('ContributionstoCandidates', 'pas2'),
               ('ContributionsbyIndividuals', 'indiv'), 
               ('OperatingExpenditures', 'oppexp')]
-    YEARS = ['18', '16']
+    YEARS = ['18', '16', '14']
 
 
 
@@ -156,25 +162,34 @@ if __name__ == "__main__":
 
 
     ## Download the data files and import to postgres
+    invalid_lines = {}
     for table, year in itertools.product(TABLES, YEARS):
         
         print(f'Processing data for {table_name}{year}')
         archive_name = table[1]
         table_name = table[0]
+        tab_year = table_name + str(year)
+        invalid_lines[tab_year] = 0
         ### Create the table
         cursor.execute(f'DROP TABLE {table_name}{year};')
-        cursor.execute(create_table(table_name+str(year), dictionaries[table_name]))
+        cursor.execute(create_table(tab_year, dictionaries[table_name]))
 
         url = urlopen(f'ftp://ftp.fec.gov/FEC/20{year}/{archive_name}{year}.zip')
         with zipfile.ZipFile(BytesIO(url.read())) as z:
             a_name = z.namelist()[0]
             for i,line in enumerate(z.open(a_name)):
                 line = line.decode("utf-8")
-                row = parse_fec_data_line(line, dictionaries[table_name])
+                try:
+                    row = parse_fec_data_line(line, dictionaries[table_name])
+                except InvalidLineError:
+                    invalid_lines[tab_year] += 1
+                    print('Invalid Line: {line}')
+
                 cursor.execute(insert_fec_row(table_name+year, 
                                               dictionaries[table_name]), row)
-                if i % 1000 == 0:
-                    print(f'Processed {i} rows')
+        print(f'Processed {i} rows')
+        n = invalid_lines[tab_year]
+        print(f'{n} invalid lines')
     
         db_connection.commit()
 
