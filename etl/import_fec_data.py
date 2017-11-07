@@ -7,9 +7,10 @@ import db_credentials
 import itertools
 import operator
 import zipfile
+import time
 
 from datetime import datetime
-from urllib.request import urlopen
+from urllib.request import urlretrieve
 from io import StringIO, BytesIO
 from bs4 import BeautifulSoup
 
@@ -96,12 +97,16 @@ class InvalidLineError(Exception):
     def __init__(self,*args,**kwargs):
         Exception.__init__(self,*args,**kwargs)
 
-def parse_fec_data_line(line, data_dict):
+def parse_fec_data_line(line, data_dict, table_name):
     line = line.strip('\n')
     n_vars = len(data_dict)
     fields = line.split('|')
+    # Operating expenditures has a trailing | too much
+    if table_name == 'OperatingExpenditures':
+        del fields[-1]
     if len(fields) != n_vars:
-        raise InvalidlineError()
+        print(len(fields), n_vars)
+        raise InvalidLineError()
 
     
     out = [None]*n_vars
@@ -113,18 +118,41 @@ def parse_fec_data_line(line, data_dict):
         if 'TEXT' in dtype:
             out[position] = string_value
         elif 'DECIMAL' in dtype:
-            out[position] = float(string_value)
+            try:
+                out[position] = float(string_value)
+            except ValueError as e:
+                #print(f'Non float value: "{string_value}"')
+                out[position] = None
         elif 'DATE' in dtype:
             try:
                 out[position] = datetime.strptime(string_value, '%m%d%Y')
             except ValueError:
+                #print(f'Non date value: "{string_value}"')
                 out[position] = None
 
         else:
             raise ValueError(f'Unexpected dtype: {dtype}')
 
     return out
-            
+
+
+def reporthook(count, block_size, total_size):
+    global start_time
+    if count == 0:
+        start_time = time.time()
+        return
+    duration = time.time() - start_time
+    progress_size = int(count * block_size)
+    speed = int(progress_size / (1024 * duration))
+    percent = min(int(count * block_size * 100 / total_size), 100)
+    sys.stdout.write("\r...{}%, {} MB, {} KB/s, {} seconds passed".format(
+        percent, round(progress_size / (1024 * 1024), 2), round(speed, 2), 
+        round(duration, 2)))
+    sys.stdout.flush()
+
+def save(url, filename):
+    print(f"Downloading {url}")
+    urlretrieve(url, filename, reporthook)
 
 if __name__ == "__main__":
 
@@ -138,17 +166,18 @@ if __name__ == "__main__":
               ('CommitteetoCommittee', 'oth'), 
               ('ContributionstoCandidates', 'pas2'),
               ('ContributionsbyIndividuals', 'indiv'), 
-              ('OperatingExpenditures', 'oppexp')]
-    YEARS = ['18', '16', '14']
-
-
+              ('OperatingExpenditures', 'oppexp')
+              ]
+    YEARS = ['18', 
+            '16', 
+            '14'
+            ]
 
     ## Download all data dictionaries
     dictionaries = {}
     for table_name,_ in TABLES:
         print(f'Processing {table_name}')
         dictionaries[table_name] = get_fec_data_dictionary(table_name)
-
 
     ## Establish db connection
     db_connection = psycopg2.connect((f"host='{db_credentials.DB_HOST}' "
@@ -158,41 +187,45 @@ if __name__ == "__main__":
                                       f"password='{db_credentials.DB_PASSWORD}'"))
     cursor = db_connection.cursor()
 
-       
-
-
     ## Download the data files and import to postgres
     invalid_lines = {}
     for table, year in itertools.product(TABLES, YEARS):
-        
-        print(f'Processing data for {table_name}{year}')
         archive_name = table[1]
         table_name = table[0]
         tab_year = table_name + str(year)
-        invalid_lines[tab_year] = 0
-        ### Create the table
-        cursor.execute(f'DROP TABLE {table_name}{year};')
-        cursor.execute(create_table(tab_year, dictionaries[table_name]))
+        print(f'\n\nProcessing data for {tab_year}')
 
-        url = urlopen(f'ftp://ftp.fec.gov/FEC/20{year}/{archive_name}{year}.zip')
-        with zipfile.ZipFile(BytesIO(url.read())) as z:
-            a_name = z.namelist()[0]
-            for i,line in enumerate(z.open(a_name)):
-                line = line.decode("utf-8")
-                try:
-                    row = parse_fec_data_line(line, dictionaries[table_name])
-                except InvalidLineError:
-                    invalid_lines[tab_year] += 1
-                    print('Invalid Line: {line}')
+        # Download the data
+        url = f'ftp://ftp.fec.gov/FEC/20{year}/{archive_name}{year}.zip'
+        dl_filename = f'{tab_year}_data.zip'
+        if not os.path.exists(dl_filename):
+            save(url, dl_filename)
 
-                cursor.execute(insert_fec_row(table_name+year, 
+        # Write data to db
+        ## Create the SQL table
+        print(f'\nInserting data into table {tab_year}')
+        try:
+            cursor.execute(create_table(tab_year, dictionaries[table_name]))
+        except psycopg2.ProgrammingError as e:
+            print(e)
+            db_connection.commit()
+            continue
+
+        # Extract the datafile from the zip archive and remove the archive
+        with zipfile.ZipFile(dl_filename, 'r') as archive:
+            data_file = archive.namelist()[0]
+            archive.extract(data_file)
+        #os.remove(dl_filename)
+ 
+        with open(data_file, errors='replace') as infile:
+            for line in infile:
+                row = parse_fec_data_line(line, dictionaries[table_name],
+                                          table_name)
+                cursor.execute(insert_fec_row(tab_year, 
                                               dictionaries[table_name]), row)
         print(f'Processed {i} rows')
-        n = invalid_lines[tab_year]
-        print(f'{n} invalid lines')
-    
         db_connection.commit()
+        os.remove(data_file)
 
     cursor.close()
     db_connection.close()
-
