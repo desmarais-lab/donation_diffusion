@@ -1,5 +1,5 @@
 library(tidyverse)
-devtools::install('~/projects/NetworkInference/')
+#devtools::install('~/projects/NetworkInference/')
 library(NetworkInference)
 library(microbenchmark)
 
@@ -77,5 +77,19 @@ cascades <- as_cascade_long(df, cascade_node_name = 'Donor_ID',
                             node_names = unique(df$Donor_ID))
 
 smry <- summary(cascades) 
-res <- netinf(cascades, n_edges = 10000, lambda = 5)
-save(res, 'diffnet.RData')
+res <- netinf(cascades, n_edges = 20, lambda = 5)
+save(res, file = 'small_diffnet.RData')
+
+
+
+load('small_diffnet.RData')
+
+# Get types of nodes
+donors <- group_by(df, Donor_ID) %>% summarize(origin_type = Donor_Tp[1],
+                                               destination_type = Donor_Tp[1])
+
+sumdat <- left_join(res, select(donors, -destination_type), 
+                    by = c('origin_node' = 'Donor_ID')) %>%
+    left_join(select(donors, -origin_type), by = c('origin_node' = 'Donor_ID'))
+
+plot(res)
