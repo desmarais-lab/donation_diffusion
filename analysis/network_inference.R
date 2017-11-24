@@ -1,5 +1,7 @@
 library(tidyverse)
-devtools::install('~/projects/NetworkInference/')
+devtools::install_github('desmarais-lab/NetworkInference', ref = 'devel')
+#devtools::install('~/projects/NetworkInference/')
+#detach("package:NetworkInference", unload=TRUE)
 library(NetworkInference)
 library(microbenchmark)
 
@@ -16,7 +18,7 @@ if(year == 2014) {
 }
 
 
-df <- read_csv(infile) %>%
+df <- read_csv(infile, n_max = 100000) %>%
     # Remove transactions that are not considered donations
     filter(!is.element(Tran_Tp, 
                        c('19', '24A', '24C', '24E', '24F', '24N', '29')),
@@ -60,7 +62,8 @@ df$integer_date <- as.integer(df$Date)
 bak <- df
 # Final transformation: Remove the N lest active donors
 #N <- length(unique(df$Donor_ID))
-N <- 5000
+
+N <- 100
 donor_smry <- group_by(df, Donor_ID) %>%
     summarize(n_recips = length(unique(Recip_ID))) %>%
     arrange(desc(n_recips)) %>%
@@ -91,7 +94,7 @@ cascades <- as_cascade_long(df, cascade_node_name = 'Donor_ID',
                             node_names = unique(df$Donor_ID))
 
 smry <- summary(cascades) 
-res <- netinf(cascades, n_edges = 1, lambda = 10)
+res <- netinf(cascades, n_edges = 10, lambda = 10)
 save(res, file = 'diffnet_trees_2014_N5000.RData')
 
 stop('Completed.')
