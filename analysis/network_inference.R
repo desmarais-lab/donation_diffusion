@@ -57,12 +57,13 @@ while(n_row_diff > 0) {
     cat(paste0('Removed ', n_row_diff, ' rows.\n'))
 }
 df$integer_date <- as.integer(df$Date)
-
+bak <- df
 # Final transformation: Remove the N lest active donors
-N <- length(unique(df$Donor_ID))
+#N <- length(unique(df$Donor_ID))
+N <- 5000
 donor_smry <- group_by(df, Donor_ID) %>%
     summarize(n_recips = length(unique(Recip_ID))) %>%
-    arrange(n_recips) %>%
+    arrange(desc(n_recips)) %>%
     mutate(in_top = ifelse(row_number() <= N, TRUE, FALSE))
  
 df <-left_join(df, donor_smry, by=c('Donor_ID')) %>%
@@ -91,7 +92,7 @@ cascades <- as_cascade_long(df, cascade_node_name = 'Donor_ID',
 
 smry <- summary(cascades) 
 res <- netinf(cascades, n_edges = 1, lambda = 10)
-save(res, file = 'small_diffnet_16.RData')
+save(res, file = 'diffnet_trees_2014_N5000.RData')
 
 stop('Completed.')
 
