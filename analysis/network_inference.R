@@ -1,10 +1,22 @@
 library(tidyverse)
-#devtools::install('~/projects/NetworkInference/')
+devtools::install('~/projects/NetworkInference/')
 library(NetworkInference)
 library(microbenchmark)
 
 # Read and basic preproc
-df <- read_csv('../data/EL_14.csv') %>%
+year <- 2014
+if(year == 2014) {
+    infile <- '../data/EL_14.csv'
+    date_low <- as.Date('2013-01-01')
+    date_high <- as.Date('2015-01-01')
+} else {
+    infile <- '../data/EL_16.csv'
+    date_low <- as.Date('2015-01-01')
+    date_high <- as.Date('2017-01-01')   
+}
+
+
+df <- read_csv(infile) %>%
     # Remove transactions that are not considered donations
     filter(!is.element(Tran_Tp, 
                        c('19', '24A', '24C', '24E', '24F', '24N', '29')),
@@ -14,7 +26,7 @@ df <- read_csv('../data/EL_14.csv') %>%
            !is.na(Amt)) %>%
     # Some dates are not in range of data prob data mistakes
     mutate(Date = as.Date(Date, '%m/%d/%Y')) %>%
-    filter(Date >= as.Date('2013-01-01'), Date < as.Date("2015-01-01")) %>%
+    filter(Date >= date_low, Date < date_high) %>%
     group_by(Donor_ID, Recip_ID) %>%
     arrange(Date) %>%
     # Only keep the first donation (in time) for each donor - recipient dyad
@@ -25,6 +37,7 @@ df <- read_csv('../data/EL_14.csv') %>%
 # - Recipients with less than 2 unique donors
 # - Donors that give to only one candidate
 # - Iteratively remove them untill all isolates are gone:
+n <- 1
 n_row_diff <- 1
 while(n_row_diff > 0) {
         
@@ -37,7 +50,7 @@ while(n_row_diff > 0) {
     
     df <- left_join(df, recip_smry, by=c('Recip_ID')) %>%
         left_join(donor_smry, by=c('Donor_ID')) %>%
-        filter(n_donors > 1, n_recips > 1) %>%
+        filter(n_donors > n, n_recips > n) %>%
         select(-n_donors, -n_recips)
     
     n_row_diff <- n_row_before - nrow(df)
@@ -45,11 +58,11 @@ while(n_row_diff > 0) {
 }
 df$integer_date <- as.integer(df$Date)
 
-# Final transformation: Only use the N most active donors
-N <- 5000
+# Final transformation: Remove the N lest active donors
+N <- length(unique(df$Donor_ID))
 donor_smry <- group_by(df, Donor_ID) %>%
     summarize(n_recips = length(unique(Recip_ID))) %>%
-    arrange(desc(n_recips)) %>%
+    arrange(n_recips) %>%
     mutate(in_top = ifelse(row_number() <= N, TRUE, FALSE))
  
 df <-left_join(df, donor_smry, by=c('Donor_ID')) %>%
@@ -77,12 +90,11 @@ cascades <- as_cascade_long(df, cascade_node_name = 'Donor_ID',
                             node_names = unique(df$Donor_ID))
 
 smry <- summary(cascades) 
-res <- netinf(cascades, n_edges = 20, lambda = 5)
-save(res, file = 'small_diffnet.RData')
+res <- netinf(cascades, n_edges = 1, lambda = 10)
+save(res, file = 'small_diffnet_16.RData')
 
+stop('Completed.')
 
-
-load('small_diffnet.RData')
 
 # Get types of nodes
 donors <- group_by(df, Donor_ID) %>% summarize(origin_type = Donor_Tp[1],
@@ -90,6 +102,14 @@ donors <- group_by(df, Donor_ID) %>% summarize(origin_type = Donor_Tp[1],
 
 sumdat <- left_join(res, select(donors, -destination_type), 
                     by = c('origin_node' = 'Donor_ID')) %>%
-    left_join(select(donors, -origin_type), by = c('origin_node' = 'Donor_ID'))
+    left_join(select(donors, -origin_type), 
+              by = c('destination_node' = 'Donor_ID')) %>%
+    tbl_df()
 
-plot(res)
+table(sumdat$origin_type)
+table(sumdat$destination_type)
+
+library(igraph)
+nw <- graph_from_edgelist(as.matrix(res[, -3]))
+hist(degree(nw, mode = 'out'), main = 'out degree distribution', breaks = 30)
+hist(degree(nw, mode = 'in'), main = 'in degree distribution', breaks = 30)
