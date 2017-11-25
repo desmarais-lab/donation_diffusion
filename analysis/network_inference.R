@@ -94,7 +94,7 @@ cascades <- as_cascade_long(df, cascade_node_name = 'Donor_ID',
                             node_names = unique(df$Donor_ID))
 
 smry <- summary(cascades) 
-res <- netinf(cascades, n_edges = 10, lambda = 10)
+res <- netinf(cascades, n_edges = 10, lambda = 0.25)
 save(res, file = 'diffnet_trees_2014_N5000.RData')
 
 stop('Completed.')
