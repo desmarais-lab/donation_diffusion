@@ -15,7 +15,7 @@ df <- read_csv(infile)
 nrow_initial <- nrow(df)
 
 df <- df %>%
-    select(Donor_ID, Recip_ID, Amt, Tran_Tp, Recip_Tp, Date) %>%
+    select(Donor_ID, Recip_ID, Amt, Tran_Tp, Recip_Tp, Date, Donor_Tp) %>%
     # Remove rows with missing data
     na.omit() %>%
     mutate(Date = as.Date(Date, '%m/%d/%Y')) %>%
@@ -25,7 +25,7 @@ df <- df %>%
     # With non-candidate recipients
     filter(!is.element(Tran_Tp, c('19', '24A', '24C', '24E', '24F', 
                                   '24N', '29')),
-           Amt > 0, Date >= date_low, Date < date_high, Recip_Tp != 'CAND') %>%
+           Amt > 0, Date >= date_low, Date < date_high, Recip_Tp == 'CAND') %>%
     group_by(Donor_ID, Recip_ID) %>%
     arrange(Date) %>%
     # Only keep the first donation (in time) for each donor - recipient dyad
