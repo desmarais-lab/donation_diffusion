@@ -1,15 +1,15 @@
-devtools::install_github('desmarais-lab/NetworkInference', ref = 'devel')
+#devtools::install_github('desmarais-lab/NetworkInference', ref = 'devel')
+devtools::load_all('../../NetworkInference')
 library(tidyverse)
-library(NetworkInference)
-library(microbenchmark)
+#library(NetworkInference)
 
 # Read and basic preproc
 year <- as.integer(commandArgs(trailingOnly = TRUE)[1])
+N <- as.integer(commandArgs(trailingOnly = TRUE)[2])
 
 infile <- paste0('../data/EL_', substr(as.character(year), 3, 4), '.csv')
 date_low <- as.Date(paste0(as.character(year - 1), '-01-01'))
 date_high <- as.Date(paste0(as.character(year + 1), '-01-01'))
-isolate_threshold <- 2
 
 df <- read_csv(infile)
 nrow_initial <- nrow(df)
@@ -36,35 +36,53 @@ nrow_with_isolates <- nrow(df)
 # - Recipients with less than 2 unique donors
 # - Donors that give to only one candidate
 # - Iteratively remove them untill all isolates are gone:
-n_row_diff <- 1
-while(n_row_diff > 0) {
-    n_row_before <- nrow(df)
-    recip_smry <- group_by(df, Recip_ID) %>%
-        summarize(n_donors = length(unique(Donor_ID)))
-    donor_smry <- group_by(df, Donor_ID) %>%
-        summarize(n_recips = length(unique(Recip_ID)))
-    df <- left_join(df, recip_smry, by=c('Recip_ID')) %>%
-        left_join(donor_smry, by=c('Donor_ID')) %>%
-        filter(n_donors > isolate_threshold, 
-               n_recips > isolate_threshold) %>%
-        select(-n_donors, -n_recips)
-    n_row_diff <- n_row_before - nrow(df)
-    cat(paste0('Removed ', n_row_diff, ' rows.\n'))
+remove_isolates <- function(df, isolate_threshold) {
+    n_row_diff <- 1
+    while(n_row_diff > 0) {
+        n_row_before <- nrow(df)
+        recip_smry <- group_by(df, Recip_ID) %>%
+            summarize(n_donors = length(unique(Donor_ID)))
+        donor_smry <- group_by(df, Donor_ID) %>%
+            summarize(n_recips = length(unique(Recip_ID)))
+        df <- left_join(df, recip_smry, by=c('Recip_ID')) %>%
+            left_join(donor_smry, by=c('Donor_ID')) %>%
+            filter(n_donors > isolate_threshold, 
+                   n_recips > isolate_threshold) %>%
+            select(-n_donors, -n_recips)
+        n_row_diff <- n_row_before - nrow(df)
+        cat(paste0('Removed ', n_row_diff, ' rows.\n'))
+    }
+    return(df)
 }
-df$integer_date <- as.integer(df$Date)
+
+# First remove donors and candidates that give/receive to/from only 1
+cat(paste(length(unique(df$Donor_ID), 'unique donors, removing isolates...\n')))
+isolate_threshold <- 1
+df <- remove_isolates(df, isolate_threshold)
+
+# If there are more than N donors, increase threshold
+while(length(unique(df$Donor_ID)) > N){
+    isolate_threshold <- isolate_threshold + 1
+    l <- length(unique(df$Donor_ID))
+    cat(paste(l, 'unique Donors increasing isolate threshold to', 
+              isolate_threshold, '\n'))
+    df <- remove_isolates(df, isolate_threshold)
+}
 nrow_without_isolates <- nrow(df)
 
-# If there are more than 5000 donors, remove the least active ones
-N <- 5000
-donor_smry <- group_by(df, Donor_ID) %>%
-    summarize(n_recips = length(unique(Recip_ID))) %>%
-    arrange(desc(n_recips)) %>%
-    mutate(in_top = ifelse(row_number() <= N, TRUE, FALSE))
- 
-df <-left_join(df, donor_smry, by=c('Donor_ID')) %>%
-    filter(in_top) %>%
-    select(-n_recips, -in_top)
+#donor_smry <- group_by(df, Donor_ID) %>%
+#    summarize(n_recips = length(unique(Recip_ID))) %>%
+#    arrange(desc(n_recips)) %>%
+#    mutate(in_top = ifelse(row_number() <= N, TRUE, FALSE))
+# 
+#df <-left_join(df, donor_smry, by=c('Donor_ID')) %>%
+#    filter(in_top) %>%
+#    select(-n_recips, -in_top)
 nrow_most_active <- nrow(df)
+
+
+
+df$integer_date <- as.integer(df$Date)
 
 ## Descriptives
 n_donors <- length(unique(df$Donor_ID))
@@ -79,9 +97,9 @@ cascades <- as_cascade_long(df, cascade_node_name = 'Donor_ID',
                             event_time = 'integer_date', 
                             cascade_id = 'Recip_ID',
                             node_names = unique(df$Donor_ID))
-res <- netinf(cascades, n_edges = 10000, lambda = 0.25)
+res <- netinf(cascades, n_edges = 15000, lambda = 0.25)
 
 output <- list('network' = res$net, 'trees' = res$trees, 'data' = df, 
                'filter_info' = filter_info)
 
-save(output, file = paste0('../data/results/', year, '_output.RData'))
+save(output, file = paste0('../data/results/', year, '_donors_', N, '_output.RData'))
