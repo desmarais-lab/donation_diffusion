@@ -1,15 +1,64 @@
 library(tidyverse)
 library(doParallel)
 library(data.table)
-library(zelig)
+library(Zelig)
+library(ROCR)
 source('plot_theme.R')
 
-# Find optimal number of edges (per network computation)
 
-count_recip_connections <- function(i, combos, donations, edges, unique_o) {
-    #start <- Sys.time()
-    donor <- as.character(combos[i, "Donor_ID"])
-    recip <- as.character(combos[i, "Recip_ID"])
+# Generate the dataset 
+
+## Load the donation data that was used to infer the network and the full network
+load('../data/results/2016_output.RData')
+df <- data.table(output$data)[, Donor_ID, Recip_ID]
+nw <- data.table(output$network)
+nw <- nw[, origin_node, destination_node] # Don't set the key here! Will mess up the order 
+setkey(df, Donor_ID, Recip_ID)
+    
+## Generate Grid of all Donor - Recipient pairs
+donors <- unique(df$Donor_ID)
+recipients <- unique(df$Recip_ID)
+grid <- data.table(expand.grid(donors, recipients))
+colnames(grid) <- c("Donor_ID", "Recip_ID")
+
+# Generate the outcome variable (1 if there is a donation form i->j 0 otherwise)
+df$y <- 1
+setkey(grid, Donor_ID, Recip_ID)
+grid <- df[grid]
+grid[is.na(y), y := 0]
+
+## Create the train / test indicator (stratified by the outcome variable)
+## The training set is balanced (model will be corrected with weighting)
+## The test set is reflecting the original proportions of the data
+n_1 <- nrow(df)
+n_1_train <- floor(n_1 * 0.7)
+n_1_test <- ceiling(n_1 * 0.3)
+n_0 <- nrow(grid) - n_1
+n_0_train <- n_1_train
+n_0_test <- floor((n_0 / n_1) * n_1_test)
+
+set.seed(34178784)
+grid[, training_set := rep(-1L, nrow(grid))]
+### The 1's will be split up completely between train and test
+grid[y == 1, training_set := as.integer(sample(1:n_1, n_1) <= n_1_train)]
+### The 0's get equal proportionate test and equal train
+#### Generate a selection variable to randomly draw zeros for each train and test
+grid[, tt_select := as.integer(rep(NA, nrow(grid)))]
+grid[y == 0, tt_select := sample(1:n_0, n_0)]
+#### Take the (random) first n_0_test elements and put them in test set
+grid[tt_select < n_0_test, training_set := 0]
+#### Take the (random) last n_0_train elements and put them in the train set
+grid[tt_select >= (n_0 - n_0_train), training_set := 1]
+grid[, tt_select := NULL]
+
+# Calculate the e_ij for each network size
+
+## Function that calculated e_ij for one pair of Donor (i) - Recipient (j)
+count_recip_connections <- function(i, matches, combos, donations, edges, unique_o) {
+    if(i %% 1e3 == 0) cat(paste(i, 'of', length(matches), 
+                                'rows processed\n'))
+    donor <- as.character(combos[matches[i], "Donor_ID"])
+    recip <- as.character(combos[matches[i], "Recip_ID"])
     
     # Get all edges that involve 'donor'
     donor_connections <- rbind(edges[.(unique_o, donor), nomatch=0], 
@@ -24,169 +73,70 @@ count_recip_connections <- function(i, combos, donations, edges, unique_o) {
     # Get the number of these unique connections that also gave to recip 
     n_out <- nrow(donations[.(unique_connections, recip), nomatch=0])
     return(n_out) 
-    #return(Sys.time() - start)
 }
 
-generate_ds <- function(n_edges, res_file){
-    
-    load(paste0(result_dir, res_file))
-    df <- data.table(output$data)[, Donor_ID, Recip_ID]
-    nw_in <- output$network[1:n_edges, ]
-    nw <- data.table(nw_in)[, origin_node, destination_node]
-    # Set data table keys (ordered indices for binary search)
-    setkey(df, Donor_ID, Recip_ID)
-    setkey(nw, origin_node, destination_node)
-    
-    # Grid of all donor recipient pairs
-    donors <- unique(df$Donor_ID)
-    recipients <- unique(df$Recip_ID)
-    grid <- data.table(expand.grid(donors, recipients))
-    colnames(grid) <- c("Donor_ID", "Recip_ID")
-    
-    # Generate the outcome variable (1 if there is a donation form i->j 0 otherwise)
-    df$y <- 1
-    setkey(grid, Donor_ID, Recip_ID)
-    grid <- df[grid]
-    grid[is.na(y), y := 0]
-    
-    # Sample zero's in the grid
-    n_non_zero <- sum(grid$y) 
-    selection <- c(which(grid$y == 1), sample(which(grid$y == 0), n_non_zero))
-    ## Save the original balance
-    balance <- n_non_zero / sum(grid$y == 0)
-    grid <- grid[selection, ] 
-     
-    # Match with network data to get shortcut on donors that are not in the nw
-    # Donors that occur in grid but not in nw must have e_ij = 0
-    
-    ## Generate table with all unique donors occuring in nw
-    ud <- unique(c(nw$origin_node, nw$destination_node))
+## Remove all rows that are neither in training or test set
+grid <- grid[training_set > -1, ]
+setkey(grid, Donor_ID)
+sizes <- c(1, seq(500, 10000, 500))
+for(size in sizes) {
+    cat(paste0('Processing network of size ', size, '\n'))
+    # For each network size to be tested, generate indicator if donor in D-R dyad 
+    # even occurs in network (if not we know e_ij must be zero)
+    this_nw <- nw[1:size, ]
+    ud <- unique(c(this_nw$origin_node, this_nw$destination_node))
     donors_in_nw <- data.table(Donor_ID = ud, indicator = 1)
     setkey(donors_in_nw, Donor_ID)
-    setkey(grid, Donor_ID)
-    grid <- donors_in_nw[grid]
-    grid[, indicator := !is.na(indicator)] 
-    colnames(grid) <- c("Donor_ID", "match","Recip_ID", "y")
-    
-    # Calculate the edge_counts on the donor-recip dyads where the donor occurs
-    # in the network 
-    grid_matches <- which(grid$match)
-    uo <- unique(nw$origin_node)
-    out <- as.integer(sapply(grid_matches, count_recip_connections, grid, df, 
-                             nw, uo))
-    # Generate the edge_count variable
-    grid$e_ij <- rep(0L, nrow(grid))
-    grid[grid_matches, e_ij := out]
-
-    cat(paste('Done with', res_file, n_edges, '\n'))
-    return(grid)
+    match <- which(!is.na(donors_in_nw[grid][, indicator]))
+    # Calculate e_ij for each matching dyad (row) 
+    uo <- unique(this_nw$origin_node)
+    setkey(this_nw, origin_node, destination_node)
+    out <- sapply(1:length(match), count_recip_connections, match, grid, df, 
+                  this_nw, uo)
+    vname <- paste0('e_ij_', size)
+    grid[, counts := rep(0L, nrow(grid))]
+    grid[match, counts := out]
+    setnames(grid, "counts", vname)
 }
 
-
-
-process_res_file <- function(res_file) {
-    n_edges <- c(1, seq(500,10000, 500))
-    data_sets <- list()
-    for(i in 1:length(n_edges)) {
-        data_sets[[i]] <- generate_ds(n_edges[i], res_file)
-    }
-    return(data_sets)
+# Train models for each network size on training data
+train_model <- function(size, balance, data) {
+    form <- as.formula(paste0('y ~ e_ij_', size))
+    mod <- zelig(form, model = 'relogit', tau = balance, 
+                 case.control = 'weighting', bias.correct = TRUE, 
+                 data = data, cite = FALSE) 
+    return(mod)
 }
 
+balance <- n_1 / n_0
+models <- sapply(sizes, train_model, balance, grid[training_set == 1, ])
 
 
+# Get the out of sample performance for each model
 
-cl <- makeCluster(10, outfile="")
-registerDoParallel(cl)
+## inverse logistic function
+logit <- function(x) 1 / (1 + exp(-x))
 
-result_dir <- '../data/results/'
-
-# Load diffusion networks
-res_files <- list.files(result_dir)
-
-out <- foreach(i=1:length(res_files), 
-               .packages = c("tidyverse", "data.table", "Zelig")) %dopar% {
-            #print(paste('Processing', res_files[i])) 
-            process_res_file(res_files[i])
-               }
-
-save(out, file = 'edge_likelihood.RData')
-#load('edge_likelihood.RData')
-stop('Completed')
-
-
-
-
-    mod <- zelig(y ~ e_ij, model = "relogit", tau = balance, 
-                 case.control = c("weighting"),
-                 bias.correct = TRUE, data = grid, cite = FALSE)
-
-    aic <- mod$from_zelig_model()$aic
-
-
-# Get n in grid and n with downsampled 0's
-ns_grid <- rep(NA, length(res_files))
-ns_down_sampled <- rep(NA, length(res_files))
-
-for(i in 1:length(res_files)) {
+auc <- function(i, data) {
     print(i)
-    load(paste0(result_dir, res_files[i]))
-    df <- data.table(output$data)[, Donor_ID, Recip_ID]
-    # Set data table keys (ordered indices for binary search)
-    setkey(df, Donor_ID, Recip_ID)
-    
-    # Grid of all donor recipient pairs
-    donors <- unique(df$Donor_ID)
-    recipients <- unique(df$Recip_ID)
-    grid <- data.table(expand.grid(donors, recipients))
-    ns_grid <- nrow(grid)
-    colnames(grid) <- c("Donor_ID", "Recip_ID")
-    
-    # Generate the outcome variable (1 if there is a donation form i->j 0 otherwise)
-    df$y <- 1
-    setkey(grid, Donor_ID, Recip_ID)
-    grid <- df[grid]
-    grid[is.na(y), y := 0]
-    
-    # Sample zero's in the grid
-    n_non_zero <- sum(grid$y) 
-    selection <- c(which(grid$y == 1), sample(which(grid$y == 0), n_non_zero))
-    ## Save the original balance
-    balance <- n_non_zero / sum(grid$y == 0)
-    grid <- grid[selection, ] 
-    
-    ns_down_sampled[i] <- nrow(grid)
+    size <- sizes[i]
+    model <- models[[i]]
+    y_true <- data[training_set == 0, y]
+    vname <- paste0('e_ij_', size)
+    x <- cbind(1, data[training_set == 0, get(vname)])
+    betas <- coef(model)
+    y_pred <- as.integer(logit(x %*% betas) >= 0.5)
+    pred <- prediction(y_pred, y_true)
+    auc <- as.numeric(performance(pred,"auc")@y.values)
+    return(auc)
 }
 
-aics <- as_data_frame(do.call(rbind, out))
-aics$year <- gsub('\\D', '', res_files)
-aics$n_obs_raw <- ns_grid
-aics$n_obs_down_sampled <- ns_down_sampled
-colnames(aics) <- c(as.character(seq(1, 1e4, 500)), 'year', 'n_obs_raw', 'n_obs_down_sampled')
-pdat <- gather(aics, n_edges, AIC, -year, -n_obs_raw, -n_obs_down_sampled)
-pdat$n_edges <- as.integer(pdat$n_edges)
-pdat$log_likelihood <- (4 - pdat$AIC) / 2
-pdat$edge_penalized_aic <- (2 * (pdat$n_edges + 2) - 2 * pdat$log_likelihood) * 1e-5
-pdat$bic_ds <- -2 * pdat$log_likelihood + (pdat$n_edges + 2) * log(pdat$n_obs_down_sampled)
-pdat$bic_raw <- -2 * pdat$log_likelihood + (pdat$n_edges + 2) * log(pdat$n_obs_raw)
-ggplot(pdat) +
-    geom_point(aes(x = n_edges, y = edge_penalized_aic), size = 0.7) +
-    geom_line(aes(x = n_edges, y = edge_penalized_aic, group = year)) +
-    ylab("AIC * 10e-4") +
-    facet_wrap(~year) +
-    plot_theme
-ggsave(filename = '../paper/figures/aics.png')
-ggplot(pdat) +
-    geom_point(aes(x = n_edges, y = bic_ds), size = 0.7) +
-    geom_line(aes(x = n_edges, y = bic_ds, group = year)) +
-    ylab("BIC") +
-    facet_wrap(~year) +
-    plot_theme
-ggsave(filename = '../paper/figures/bics.png')
-ggplot(pdat) +
-    geom_point(aes(x = n_edges, y = bic_raw), size = 0.7) +
-    geom_line(aes(x = n_edges, y = bic_raw, group = year)) +
-    ylab("BIC") +
-    facet_wrap(~year) +
-    plot_theme
-ggsave(filename = '../paper/figures/bics.png')
+aucs <- data_frame(size = sizes, 
+                   auc = sapply(1:length(sizes), auc, grid))
+save.image('edge_likelihood_workspace.RData')
+
+# Calculate the number of isolates (donors not involved in a network)
+length(unique(df$Donor_ID)) - length(unique(c(nw$destination_node, nw$origin_node)))
+
+# Plot the aucs
+ggplot(aucs, aes(x = size, y = auc))
