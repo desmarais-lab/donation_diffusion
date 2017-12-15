@@ -139,4 +139,8 @@ save.image('edge_likelihood_workspace.RData')
 length(unique(df$Donor_ID)) - length(unique(c(nw$destination_node, nw$origin_node)))
 
 # Plot the aucs
-ggplot(aucs, aes(x = size, y = auc))
+ggplot(aucs, aes(x = size, y = auc)) +
+    geom_line() +
+    geom_point() +
+    plot_theme
+ggsave('../paper/figures/auc_edges_2016.png')
