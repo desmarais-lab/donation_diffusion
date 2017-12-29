@@ -1,6 +1,7 @@
 library(NetworkInference)
 library(xtable)
 library(tidyverse)
+library(doParallel)
 
 result_dir <- '../data/results/'
 
@@ -14,6 +15,7 @@ networks <- lapply(res_files, function(x) {
     return(network)
 })
 networks <- do.call(rbind, networks) %>% tbl_df()
+
 
 # Load the donor types for each year
 donor_types <- lapply(res_files, function(x) {
@@ -56,7 +58,7 @@ edge_types_year <- group_by(networks, year) %>%
               ) %>%
     gather(Measure, Proportion, -year)
 
-ggplot(filter(edge_types_year)) +
+ggplot(filter(edge_types_year, !(year %in% c("20165000", "2004")))) +
     geom_point(aes(x = as.integer(year), y = Proportion, color = Measure, 
                    shape = Measure), size = 3) +
     geom_line(aes(x = as.integer(year), y = Proportion, color = Measure, 
@@ -69,7 +71,6 @@ ggsave(filename = '../paper/figures/edge_types_years.png')
 
 # Trees
 # 
-
 trees <- lapply(res_files, function(x) {
     load(paste0(result_dir, x))
     year <- gsub('\\_output.RData$', '', x)
@@ -116,3 +117,72 @@ ggplot(networks) +
     ylab("Number of trees edge is used in") +
     theme_bw()
 ggsave(filename = '../paper/figures/edges_in_trees.png')
+
+
+
+
+
+################################################################################
+################################################################################
+################################################################################
+# Find optimal number of edges (per network computation)
+
+load(paste0(result_dir, res_files[1]))
+df_1 <- output$data
+nw_1 <- output$network
+nw_1$indicator <- 1
+
+# Grid of all donor recipient pairs
+donors <- unique(df_1$Donor_ID)
+recipients <- unique(df_1$Recip_ID)
+grid_1 <- tbl_df(expand.grid(donors, recipients))
+colnames(grid_1) <- c('donor', 'recipient')
+
+# Generate the outcome variable (1 if there is a donation form i->j 0 otherwise)
+grid_1 <- select(df_1, Donor_ID, Recip_ID) %>%
+    mutate(y = 1) %>%
+    right_join(grid_1, by = c('Donor_ID' = 'donor', 'Recip_ID' = 'recipient')) %>%
+    ungroup()
+grid_1$y[is.na(grid_1$y)] <- 0
+
+donation_data <- select(df_1, Donor_ID, Recip_ID)
+
+count_recip_connections_old <- function(i, grd, donation_data, network_data) {
+    donor <- as.character(grd[i, 1])
+    recip <- as.character(grd[i, 2])
+    # Get every donor who gave to recip
+    donor_connections <- filter(network_data, origin_node == donor |
+                                destination_node == donor)
+    if(nrow(donor_connections) == 0) return(0)
+    
+    # Get the unique connections to 'donor' in the network
+    a <- select(donor_connections, origin_node) %>% 
+        filter(origin_node != donor) 
+    b <- select(donor_connections, destination_node) %>% 
+        filter(destination_node != donor) 
+    unique_connections <- unique(c(a[,1], b[, 1]))
+    
+    # Get the number of these unique connections that also gave to recip 
+    n_out <- filter(donation_data, Recip_ID == recip, 
+                    Donor_ID %in% unique_connections) %>% nrow
+    return(n_out) 
+}
+
+## SO example
+n = 1e6
+DT = data.table(A = sample(letters, n, replace = TRUE), 
+                B = sample(letters, n, replace = TRUE), value = 1:n)
+setkey(DT, A, B)
+uA <- unique(DT[, A])
+
+library(microbenchmark)
+Union = function(){
+   mya = DT["y", which=TRUE]
+   myb = DT["y", which=TRUE]
+   DT[union(mya,myb)] 
+} 
+microbenchmark(
+    "reduce" = DT[DT[, Reduce('|', lapply(.SD, '==', 'y')), .SDcols = A:B]],
+    "rbind" = rbind(DT[.(uA, "y"), nomatch=0], DT[.("y"), nomatch=0]),
+    "union" = Union()
+)

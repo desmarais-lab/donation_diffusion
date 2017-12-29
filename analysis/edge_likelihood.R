@@ -51,12 +51,14 @@ grid[tt_select < n_0_test, training_set := 0]
 grid[tt_select >= (n_0 - n_0_train), training_set := 1]
 grid[, tt_select := NULL]
 
+# Calculate the number of donations for each recipient
+grid[, recip_n_donations := sum(y), by=Recip_ID]
+
 # Calculate the e_ij for each network size
 
 ## Function that calculated e_ij for one pair of Donor (i) - Recipient (j)
 count_recip_connections <- function(i, matches, combos, donations, edges, unique_o) {
-    if(i %% 1e3 == 0) cat(paste(i, 'of', length(matches), 
-                                'rows processed\n'))
+
     donor <- as.character(combos[matches[i], "Donor_ID"])
     recip <- as.character(combos[matches[i], "Recip_ID"])
     
@@ -79,6 +81,12 @@ count_recip_connections <- function(i, matches, combos, donations, edges, unique
 grid <- grid[training_set > -1, ]
 setkey(grid, Donor_ID)
 sizes <- c(1, seq(500, 10000, 500))
+
+## Init parallel cluster
+cl <- makeCluster(8, outfile = '')
+registerDoParallel(cl)
+foreach(i=1:3) %dopar% sqrt(i)
+
 for(size in sizes) {
     cat(paste0('Processing network of size ', size, '\n'))
     # For each network size to be tested, generate indicator if donor in D-R dyad 
@@ -91,17 +99,25 @@ for(size in sizes) {
     # Calculate e_ij for each matching dyad (row) 
     uo <- unique(this_nw$origin_node)
     setkey(this_nw, origin_node, destination_node)
-    out <- sapply(1:length(match), count_recip_connections, match, grid, df, 
-                  this_nw, uo)
+    out <- foreach(i=1:length(match), .packages=c("data.table"), 
+                   .combine=c) %dopar% {
+        if(i %% 1e3 == 0) cat(paste(i, 'of', length(match), 
+                              'rows processed\n'))  
+        count_recip_connections(i, match, grid, df, this_nw, uo)
+    }
+    #out <- sapply(1:length(match), count_recip_connections, match, grid, df, 
+    #              this_nw, uo)
     vname <- paste0('e_ij_', size)
     grid[, counts := rep(0L, nrow(grid))]
     grid[match, counts := out]
     setnames(grid, "counts", vname)
 }
 
+save(grid, file = 'edge_likelihood_grid.RData')
+
 # Train models for each network size on training data
 train_model <- function(size, balance, data) {
-    form <- as.formula(paste0('y ~ e_ij_', size))
+    form <- as.formula(paste0('y ~ recip_n_donations + e_ij_', size))
     mod <- zelig(form, model = 'relogit', tau = balance, 
                  case.control = 'weighting', bias.correct = TRUE, 
                  data = data, cite = FALSE) 
@@ -123,9 +139,10 @@ auc <- function(i, data) {
     model <- models[[i]]
     y_true <- data[training_set == 0, y]
     vname <- paste0('e_ij_', size)
-    x <- cbind(1, data[training_set == 0, get(vname)])
+    x <- as.matrix(cbind(1, data[training_set == 0, get(vname), recip_n_donations]))
     betas <- coef(model)
-    y_pred <- as.integer(logit(x %*% betas) >= 0.5)
+    #y_pred <- as.integer(logit(x %*% betas) >= 0.5)
+    y_pred <- logit(x %*% betas)
     pred <- prediction(y_pred, y_true)
     auc <- as.numeric(performance(pred,"auc")@y.values)
     return(auc)
@@ -133,7 +150,8 @@ auc <- function(i, data) {
 
 aucs <- data_frame(size = sizes, 
                    auc = sapply(1:length(sizes), auc, grid))
-save.image('edge_likelihood_workspace.RData')
+
+#save.image('edge_likelihood_workspace.RData')
 
 # Calculate the number of isolates (donors not involved in a network)
 length(unique(df$Donor_ID)) - length(unique(c(nw$destination_node, nw$origin_node)))
