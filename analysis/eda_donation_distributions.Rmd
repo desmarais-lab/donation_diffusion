@@ -19,8 +19,8 @@ load(paste0(result_dir, '2016_output.RData'))
 ## Preprocessing
 
 I include the preprocessing code so you can see what data the results are based on
-```{r, results=FALSE, cache=TRUE}
-year <- 2016
+```{r, results=FALSE, cache=TRUE, message=FALSE}
+    year <- 2016
 infile <- paste0('../data/EL_', substr(as.character(year), 3, 4), '.csv')
 date_low <- as.Date(paste0(as.character(year - 1), '-01-01'))
 date_high <- as.Date(paste0(as.character(year + 1), '-01-01'))
@@ -46,7 +46,7 @@ donors$in_network <- is.element(donors$Donor_ID, din)
 ## Number of donations by donors
 
 ### (a) tied to other nodes in the network, 
-```{r}
+```{r, echo=FALSE}
 pdat <- filter(donors, in_network)
 summary(pdat$n_records)
 ggplot(pdat) +
@@ -57,7 +57,7 @@ ggplot(pdat) +
 
 ## (b) included in the netinf calculations but not tied to any other donors, and 
 
-```{r}
+```{r, echo=FALSE}
 pdat <- filter(donors, in_inference_data, !in_network)
 summary(pdat$n_records)
 ggplot(pdat) +
@@ -67,7 +67,7 @@ ggplot(pdat) +
 ```
 
 ## (c) excluded from the netinf calculations. 
-```{r}
+```{r, echo=FALSE}
 pdat <- filter(donors, !in_inference_data)
 summary(pdat$n_records)
 ggplot(pdat) +
