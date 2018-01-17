@@ -4,8 +4,10 @@ library(tidyverse)
 #library(NetworkInference)
 
 # Read and basic preproc
-year <- as.integer(commandArgs(trailingOnly = TRUE)[1])
-N <- as.integer(commandArgs(trailingOnly = TRUE)[2])
+#year <- as.integer(commandArgs(trailingOnly = TRUE)[1])
+year <- 2016
+#N <- as.integer(commandArgs(trailingOnly = TRUE)[2])
+N <- 5000
 
 infile <- paste0('../data/EL_', substr(as.character(year), 3, 4), '.csv')
 date_low <- as.Date(paste0(as.character(year - 1), '-01-01'))
@@ -27,8 +29,8 @@ df <- df %>%
                                   '24N', '29')),
            Amt > 0, Date >= date_low, Date < date_high, Recip_Tp == 'CAND') %>%
     group_by(Donor_ID, Recip_ID) %>%
-    arrange(Date) %>%
     # Only keep the first donation (in time) for each donor - recipient dyad
+    arrange(Date) %>%
     filter(row_number() == 1)
 nrow_with_isolates <- nrow(df)
 
@@ -56,31 +58,33 @@ remove_isolates <- function(df, isolate_threshold) {
 }
 
 # First remove donors and candidates that give/receive to/from only 1
-cat(paste(length(unique(df$Donor_ID), 'unique donors, removing isolates...\n')))
+cat(paste(length(unique(df$Donor_ID)), 'unique donors, removing isolates...\n')))
 isolate_threshold <- 1
 df <- remove_isolates(df, isolate_threshold)
-
-# If there are more than N donors, increase threshold
-while(length(unique(df$Donor_ID)) > N){
-    isolate_threshold <- isolate_threshold + 1
-    l <- length(unique(df$Donor_ID))
-    cat(paste(l, 'unique Donors increasing isolate threshold to', 
-              isolate_threshold, '\n'))
-    df <- remove_isolates(df, isolate_threshold)
-}
 nrow_without_isolates <- nrow(df)
 
-#donor_smry <- group_by(df, Donor_ID) %>%
-#    summarize(n_recips = length(unique(Recip_ID))) %>%
-#    arrange(desc(n_recips)) %>%
-#    mutate(in_top = ifelse(row_number() <= N, TRUE, FALSE))
-# 
-#df <-left_join(df, donor_smry, by=c('Donor_ID')) %>%
-#    filter(in_top) %>%
-#    select(-n_recips, -in_top)
+# If there are more than N donors, increase threshold
+# We should do this in the future. However the network we are currently
+# using in the paper is still based on data that has a hard cutoff of 
+# 5000
+#while(length(unique(df$Donor_ID)) > N){
+#    isolate_threshold <- isolate_threshold + 1
+#    l <- length(unique(df$Donor_ID))
+#    cat(paste(l, 'unique Donors increasing isolate threshold to', 
+#              isolate_threshold, '\n'))
+#    df <- remove_isolates(df, isolate_threshold)
+#}
+
+# Select the 5000 most active donors
+donor_smry <- group_by(df, Donor_ID) %>%
+    summarize(n_recips = length(unique(Recip_ID))) %>%
+    arrange(desc(n_recips)) %>%
+    mutate(in_top = ifelse(row_number() <= N, TRUE, FALSE))
+ 
+df <-left_join(df, donor_smry, by=c('Donor_ID')) %>%
+    filter(in_top) %>%
+    select(-n_recips, -in_top)
 nrow_most_active <- nrow(df)
-
-
 
 df$integer_date <- as.integer(df$Date)
 
@@ -97,7 +101,7 @@ cascades <- as_cascade_long(df, cascade_node_name = 'Donor_ID',
                             event_time = 'integer_date', 
                             cascade_id = 'Recip_ID',
                             node_names = unique(df$Donor_ID))
-res <- netinf(cascades, n_edges = 15000, lambda = 0.25)
+res <- netinf(cascades, n_edges = 10000, lambda = 0.25)
 
 output <- list('network' = res$net, 'trees' = res$trees, 'data' = df, 
                'filter_info' = filter_info)
