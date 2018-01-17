@@ -58,7 +58,7 @@ remove_isolates <- function(df, isolate_threshold) {
 }
 
 # First remove donors and candidates that give/receive to/from only 1
-cat(paste(length(unique(df$Donor_ID)), 'unique donors, removing isolates...\n')))
+cat(paste(length(unique(df$Donor_ID)), 'unique donors, removing isolates...\n'))
 isolate_threshold <- 1
 df <- remove_isolates(df, isolate_threshold)
 nrow_without_isolates <- nrow(df)
