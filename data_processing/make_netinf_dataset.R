@@ -2,10 +2,7 @@ library(tidyverse)
 
 source('remove_isolates.R')
 
-year <- 2016
-# How many donors should be included
-n_nodes <- 100
-infile <- paste0('../data/EL_', substr(as.character(year), 3, 4), '.csv')
+infile <- '../data/EL_16.csv'
 date_low <- as.Date(paste0(as.character(year - 1), '-01-01'))
 date_high <- as.Date(paste0(as.character(year + 1), '-01-01'))
 
