@@ -1,17 +1,4 @@
-library(NetworkInference)
-library(xtable)
-library(tidyverse)
-
-result_dir <- '../data/results/'
-source('plot_theme.R')
-
-# ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-# Explore distributions of donors wrt their number of unique donations conditional
-# on membership in inference data, and being tied into the network
-# ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
-# Load the 2016 diffusion network
-load(paste0(result_dir, '2016_output.RData'))
+library(tidyberse)
 
 year <- 2016
 infile <- paste0('../data/EL_', substr(as.character(year), 3, 4), '.csv')
@@ -32,33 +19,6 @@ df <- read_csv(infile) %>%
 donors <- group_by(df, Donor_ID) %>%
     summarize(Donor_Tp = Donor_Tp[1],
               n_records = n())
-
-# Indicators for different donor groups (in the data used for inference and in the network (i.e. being tied to other donors))
-din <- unique(c(output$network$origin_node, output$network$destination_node))
-diif <- unique(output$data$Donor_ID)
-donors$in_inference_data <- is.element(donors$Donor_ID, diif)
-donors$in_network <- is.element(donors$Donor_ID, din)
-
-pdat <- filter(donors, in_network)
-summary(pdat$n_records)
-ggplot(pdat) +
-    geom_histogram(aes(n_records), color = "white", bins = 30) + 
-    #scale_x_log10() +
-    plot_theme
-
-pdat <- filter(donors, in_inference_data, !in_network)
-summary(pdat$n_records)
-ggplot(pdat) +
-    geom_histogram(aes(n_records), color = "white", bins = 30) + 
-    #scale_x_log10() +
-    plot_theme
-
-pdat <- filter(donors, !in_inference_data)
-summary(pdat$n_records)
-ggplot(pdat) +
-    geom_histogram(aes(n_records), color = "white", bins = 30) + 
-    #scale_x_log10() +
-    plot_theme
 
 # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # Take a stratified sample
