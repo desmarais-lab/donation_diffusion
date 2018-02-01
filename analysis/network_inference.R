@@ -1,92 +1,24 @@
-#devtools::install_github('desmarais-lab/NetworkInference', ref = 'devel')
-devtools::load_all('../../NetworkInference')
+devtools::install_github('desmarais-lab/NetworkInference', ref = 'devel')
+
 library(tidyverse)
-#library(NetworkInference)
+library(NetworkInference)
+source('../data_processing/remove_isolates.R')
 
-# Read and basic preproc
-#year <- as.integer(commandArgs(trailingOnly = TRUE)[1])
-year <- 2016
-#N <- as.integer(commandArgs(trailingOnly = TRUE)[2])
-N <- 5000
+# Number of nodes to use for inference
+n_nodes <- 5000
 
-infile <- paste0('../data/EL_', substr(as.character(year), 3, 4), '.csv')
-date_low <- as.Date(paste0(as.character(year - 1), '-01-01'))
-date_high <- as.Date(paste0(as.character(year + 1), '-01-01'))
-
-df <- read_csv(infile)
-nrow_initial <- nrow(df)
-
-df <- df %>%
-    select(Donor_ID, Recip_ID, Amt, Tran_Tp, Recip_Tp, Date, Donor_Tp) %>%
-    # Remove rows with missing data
-    na.omit() %>%
-    mutate(Date = as.Date(Date, '%m/%d/%Y')) %>%
-    # Remove transactions that are not considered donations
-    # Remove transactions with negative and 0 amount (refunds)
-    # Rows with transaction dates outside the period
-    # With non-candidate recipients
-    filter(!is.element(Tran_Tp, c('19', '24A', '24C', '24E', '24F', 
-                                  '24N', '29')),
-           Amt > 0, Date >= date_low, Date < date_high, Recip_Tp == 'CAND') %>%
-    group_by(Donor_ID, Recip_ID) %>%
-    # Only keep the first donation (in time) for each donor - recipient dyad
-    arrange(Date) %>%
-    filter(row_number() == 1)
-nrow_with_isolates <- nrow(df)
-
-# Subset the data. Remove:
-# - Recipients with less than 2 unique donors
-# - Donors that give to only one candidate
-# - Iteratively remove them untill all isolates are gone:
-remove_isolates <- function(df, isolate_threshold) {
-    n_row_diff <- 1
-    while(n_row_diff > 0) {
-        n_row_before <- nrow(df)
-        recip_smry <- group_by(df, Recip_ID) %>%
-            summarize(n_donors = length(unique(Donor_ID)))
-        donor_smry <- group_by(df, Donor_ID) %>%
-            summarize(n_recips = length(unique(Recip_ID)))
-        df <- left_join(df, recip_smry, by=c('Recip_ID')) %>%
-            left_join(donor_smry, by=c('Donor_ID')) %>%
-            filter(n_donors > isolate_threshold, 
-                   n_recips > isolate_threshold) %>%
-            select(-n_donors, -n_recips)
-        n_row_diff <- n_row_before - nrow(df)
-        cat(paste0('Removed ', n_row_diff, ' rows.\n'))
-    }
-    return(df)
-}
-
-# First remove donors and candidates that give/receive to/from only 1
-cat(paste(length(unique(df$Donor_ID)), 'unique donors, removing isolates...\n'))
-isolate_threshold <- 1
-df <- remove_isolates(df, isolate_threshold)
-nrow_without_isolates <- nrow(df)
+# Read the preprocessed data (see `make_netinf_data.R` for details)
+df <- read_csv('../data/data_for_netinf.R')
 
 # If there are more than N donors, increase threshold
-# We should do this in the future. However the network we are currently
-# using in the paper is still based on data that has a hard cutoff of 
-# 5000
-#while(length(unique(df$Donor_ID)) > N){
-#    isolate_threshold <- isolate_threshold + 1
-#    l <- length(unique(df$Donor_ID))
-#    cat(paste(l, 'unique Donors increasing isolate threshold to', 
-#              isolate_threshold, '\n'))
-#    df <- remove_isolates(df, isolate_threshold)
-#}
-
-# Select the 5000 most active donors
-donor_smry <- group_by(df, Donor_ID) %>%
-    summarize(n_recips = length(unique(Recip_ID))) %>%
-    arrange(desc(n_recips)) %>%
-    mutate(in_top = ifelse(row_number() <= N, TRUE, FALSE))
- 
-df <-left_join(df, donor_smry, by=c('Donor_ID')) %>%
-    filter(in_top) %>%
-    select(-n_recips, -in_top)
-nrow_most_active <- nrow(df)
-
-df$integer_date <- as.integer(df$Date)
+isolate_threshold <- 2
+while(length(unique(df$Donor_ID)) > n_nodes) {
+    isolate_threshold <- isolate_threshold + 1
+    l <- length(unique(df$Donor_ID))
+    cat(paste(l, 'unique Donors increasing isolate threshold to', 
+              isolate_threshold, '\n'))
+    df <- remove_isolates(df, isolate_threshold)
+}
 
 ## Descriptives
 n_donors <- length(unique(df$Donor_ID))
