@@ -1,5 +1,5 @@
-require(stringr)
-require(data.table)
+library(stringr)
+library(data.table)
 library(bit64)
 
 ##################
