@@ -1,4 +1,4 @@
-devtools::install_github('desmarais-lab/NetworkInference', ref = 'devel')
+#devtools::install_github('desmarais-lab/NetworkInference', ref = 'devel')
 
 library(tidyverse)
 library(NetworkInference)
@@ -11,7 +11,7 @@ n_nodes <- 1000
 df <- read_csv('../data/data_for_netinf.R')
 
 # If there are more than N donors, increase threshold
-isolate_threshold <- 15
+isolate_threshold <- 1
 while(length(unique(df$Donor_ID)) > n_nodes) {
     isolate_threshold <- isolate_threshold + 1
     l <- length(unique(df$Donor_ID))
