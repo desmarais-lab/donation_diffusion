@@ -1,5 +1,5 @@
-for N in 300 500 800 1000 2000 5000 8000 10000
+for N in 300 500 1000 2000 5000 10000 15000 20000
+#for N in 300
     do 
-        tmux new-session -d -s "${N}_netinf" R CMD BATCH network_inference.R $N \
-            "${N}_netinf_out.Rout"
+        tmux new-session -d -s "${N}_netinf" Rscript network_inference.R ${N}
     done
