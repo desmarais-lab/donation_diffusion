@@ -23,7 +23,7 @@ cascades <- as_cascade_long(df, cascade_node_name = 'Donor_ID',
 
 iter = 1
 while(TRUE) {
-    res = netinf(cascades, params = init_params, max_iter = 1)
+    res = netinf(cascades, params = init_params, max_iter = 1, n_edges = 0.1)
     converged = attr(res, 'converged')
     out = list('netinf_out' = res, 'iteration' = iter,
                'converged' = converged)
