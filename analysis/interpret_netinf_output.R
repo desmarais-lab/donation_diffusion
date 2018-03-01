@@ -6,10 +6,10 @@ source('plot_theme.R')
 # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # Config
 # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-DONDAT = '../data/data_for_netinf.R'
+DONDAT = '../data/data_for_netinf.R' # should be .csv change at some point
 RESDIR = '../data/results/'
 
-threshold = 6
+threshold = 19
 
 # Load the donation data
 df = read_csv(DONDAT)
@@ -49,7 +49,8 @@ ggplot(donors) +
 ggsave('~/Dropbox/Public/ind_isolate_distribution.png')
 
 group_by(donors, matched) %>%
-    summarize(min_donations = min(n_donations),
+    summarize(n_donors = n(), 
+              min_donations = min(n_donations),
               max_doations = max(n_donations),
               mean_donations = mean(n_donations),
               median_donations = median(n_donations), 
