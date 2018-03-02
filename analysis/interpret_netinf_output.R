@@ -1,5 +1,6 @@
 library(tidyverse)
-library(ggplot)
+library(NetworkInference)
+library(ggplot2)
 source('../data_processing/remove_isolates.R')
 source('plot_theme.R')
 
@@ -9,50 +10,50 @@ source('plot_theme.R')
 DONDAT = '../data/data_for_netinf.R' # should be .csv change at some point
 RESDIR = '../data/results/'
 
-threshold = 19
+get_network = function(threshold) {
+    # Load the inferred network (latest available iteration)
+    fl = list.files(RESDIR)
+    rel_networks = fl[grepl(paste0('_', threshold, "_"), fl)]
+    last_network = rel_networks[order(
+        as.integer(
+            gsub('.RData', '', sapply(
+                strsplit(rel_networks, '_'), function(x) x[5])
+                )
+            ), decreasing = TRUE
+        )[1]]
+    load(paste0(RESDIR, last_network))
+    network = out$netinf_out
+    #network = filter(network, p_value <= 0.05)
+    network$threshold = threshold
+    return(network)
+}
+
+get_n_donors = function(threshold, data) {
+    dat = remove_isolates(data, threshold)
+    donors = group_by(dat, Donor_ID) %>%
+    summarize(total_amount = sum(Amt),
+              n_donations = n())  
+    return(nrow(donors))
+}
 
 # Load the donation data
 df = read_csv(DONDAT)
 
-# Get the same dataset that was used to infer the network
-dat = remove_isolates(df, threshold)
+# Load latest version of all networks 
+thresholds = c(5, seq(6, 18, 2))
+networks = lapply(thresholds, get_network)
+networks = tbl_df(do.call(rbind, networks))
 
-# Load the inferred network (latest available iteration)
-fl = list.files(RESDIR)
-rel_networks = fl[grepl(paste0('_', threshold, "_"), fl)]
-last_network = rel_networks[order(
-    as.integer(
-        gsub('.RData', '', sapply(
-            strsplit(rel_networks, '_'), function(x) x[5])
-            )
-        ), decreasing = TRUE
-    )[1]]
-load(paste0(RESDIR, last_network))
-network = out$netinf_out 
-
-# Check for isolates
-donors_in_network = unique(c(network$origin_node, network$destination_node))
-din_dat = data_frame(Donor_ID = donors_in_network) %>%
-    mutate(matched = 1)
-
-donors = group_by(dat, Donor_ID) %>%
-    summarize(total_amount = sum(Amt),
-              n_donations = n()) %>%
-    left_join(din_dat, by = "Donor_ID") %>%
-    mutate(matched = !is.na(matched))
+# Get the number of unique donors for each base dataset
+n_donors_in_data = sapply(thresholds, get_n_donors, data = df)
+n_donors_in_data = data_frame(threshold = thresholds, n_donors = n_donors)
 
 
-ggplot(donors) + 
-    geom_boxplot(aes(x = matched, y = n_donations)) +
-    scale_y_log10() +
-    plot_theme
-ggsave('~/Dropbox/Public/ind_isolate_distribution.png')
-
-group_by(donors, matched) %>%
-    summarize(n_donors = n(), 
-              min_donations = min(n_donations),
-              max_doations = max(n_donations),
-              mean_donations = mean(n_donations),
-              median_donations = median(n_donations), 
-              mean_amount = mean(total_amount),
-              median_amount = median(total_amount))
+pdat = left_join(networks, n_donors, by = "threshold") %>%
+    group_by(threshold) %>%
+    summarize(n_donors_in_network_origin = length(unique(origin_node)),
+              n_donors_in_network_destination = length(unique(destination_node)),
+              perc_in_data_origin = n_donors_in_network_origin / n_donors[1],
+              n_donors_in_data = n_donors[1],
+              n_edges = n())
+pdat
