@@ -55,7 +55,7 @@ donor.edgelist <- cbind(out$netinf_out$origin_node,out$netinf_out$destination_no
 # master list of nodes included in netinf
 # uniqueDonors <- unique(as.character(netinf.data$Donor_ID))
 # the following assumes no isolates
-uniqueDonors <- unique(c(donor.edgelist))
+uniqueDonors <- unique(df$Donor_ID)
 
 # throw out vertex data for nodes not included in the network
 net.vertex.data <- vertex.data[which(is.element(vertex.id,uniqueDonors)),]
