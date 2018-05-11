@@ -16,24 +16,30 @@ df <- remove_isolates(df, isolate_threshold)
 
 cat('Number of donors', length(unique(df$Donor_ID)), '\n')
 
+# If there are more than N donors, increase threshold
+isolate_threshold <- 80
+while(length(unique(df$Donor_ID)) > n_nodes) {
+    isolate_threshold <- isolate_threshold + 1
+    l <- length(unique(df$Donor_ID))
+    cat(paste(l, 'unique Donors increasing isolate threshold to', 
+              isolate_threshold, '\n'))
+    df <- remove_isolates(df, isolate_threshold)
+}
+
+## Descriptives
+n_donors <- length(unique(df$Donor_ID))
+n_recips <- length(unique(df$Recip_ID))
+cat(paste0('Number of donors: ', n_donors, '\n'))
+cat(paste0('Number of recipients: ', n_recips, '\n'))
+cat(paste0('Number of donations: ', nrow(df), '\n'))
+
 # Fit the network
 cascades <- as_cascade_long(df, cascade_node_name = 'Donor_ID', 
                             event_time = 'integer_date', 
                             cascade_id = 'Recip_ID')
 
-iter = 1
-while(TRUE) {
-    res = netinf(cascades, params = init_params, max_iter = 1, n_edges = 0.1)
-    converged = attr(res, 'converged')
-    out = list('netinf_out' = res, 'iteration' = iter,
-               'converged' = converged)
-    save(out, file = paste0('../data/results/netinf_threshold_', 
-                            isolate_threshold, '_iter_', iter, '.RData'))   
-    if(converged) break
-    else init_params = attr(res, "diffusion_model_parameters")
-    iter = iter + 1
-    if(iter > 10) {
-        print('Stopping without convergence')
-        break
-    }
-}
+res = netinf(cascades, params = init_params, max_iter = 1, n_edges = 10000)
+
+# Estimate lambda from the diffusion times in the estimated trees
+output <- list('network' = res$net, 'data' = df)
+save(output, file = paste0('../data/results/', n_nodes, 'donors.RData'))
