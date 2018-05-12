@@ -7,16 +7,16 @@ load("../data/ergm_results/ergm_results_threshold_8_pval_0.025.RData")
 set.seed(12345)
 
 # simulate networks from spatial ERGM
-spatial.networks <- simulate(simple.homophily.ergm, nsim=100,
+spatial.networks <- simulate(simple.homophily.ergm, nsim=100,constraints = ~ edges,
                              control=control.simulate.ergm(
-                                 MCMC.interval=10000000,
-                                 MCMC.burnin=10000000))
+                                 MCMC.interval=50000,
+                                 MCMC.burnin=100000))
 
 # simulate networks from directional ERGM, take 1000
-directional.networks <- simulate(ideological.hierarchy.ergm, nsim=100,
+directional.networks <- simulate(ideological.hierarchy.ergm, nsim=100,constraints = ~ edges,
                                  control=control.simulate.ergm(
-                                     MCMC.interval=10000000,
-                                     MCMC.burnin=10000000))
+                                     MCMC.interval=50000,
+                                     MCMC.burnin=100000))
 
 # save simulation results
 save(list=c("spatial.networks","directional.networks"), 
