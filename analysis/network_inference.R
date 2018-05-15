@@ -11,20 +11,8 @@ init_params = 0.012
 
 # Read the preprocessed data (see `make_netinf_data.R` for details)
 cat('threshold: ', isolate_threshold, '\n')
-df <- read_csv('../data/data_for_netinf.R')
+df <- read_csv('../data/data_for_netinf.csv')
 df <- remove_isolates(df, isolate_threshold)
-
-cat('Number of donors', length(unique(df$Donor_ID)), '\n')
-
-# If there are more than N donors, increase threshold
-isolate_threshold <- 80
-while(length(unique(df$Donor_ID)) > n_nodes) {
-    isolate_threshold <- isolate_threshold + 1
-    l <- length(unique(df$Donor_ID))
-    cat(paste(l, 'unique Donors increasing isolate threshold to', 
-              isolate_threshold, '\n'))
-    df <- remove_isolates(df, isolate_threshold)
-}
 
 ## Descriptives
 n_donors <- length(unique(df$Donor_ID))

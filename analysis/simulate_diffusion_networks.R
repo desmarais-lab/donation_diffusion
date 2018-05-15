@@ -20,7 +20,7 @@ directional.networks <- simulate(ideological.hierarchy.ergm, nsim=100,constraint
 
 # save simulation results
 save(list=c("spatial.networks","directional.networks"), 
-     file="ergm_simulation_results.RData")
+     file="../data/network_simulation/ergm_simulation_results.RData")
 
 # access the adjacency matrix from a network
 # amat <- directional.networks[[1]][,]
