@@ -16,13 +16,27 @@ box_dl(ergm_sim_file)
 load(ergm_sim_file_name)
 unlink(ergm_sim_file_name)
 
+# Load the individual donors file
+actors_file = '255302928759'
+actors_file_name = 'VLC_16_full.csv'
+actors = box_read_csv(actors_file) %>% tbl_df()
+
+## Remove non individual donors and donors without covariates
+ind_actors = filter(actors, Ent_Typ == 'IND', !is.na(ideology),
+                    !is.na(ind_cd), !is.na(ind_state))
+ind_actor_ids = ind_actors$Actor_ID
+
 # Load the inferred diffusion network
 netinf_file = '280757684849'
 netinf_file_name = 'netinf_threshold_8_iter_3.RData'
 box_dl(netinf_file)
 load(netinf_file_name)
 unlink(netinf_file_name)
-netinf.network = select(out$netinf_out, origin_node, destination_node)
+
+## 0.025 p-value threshold
+netinf_network = out$netinf_out[1:min(which(out$netinf_out$p_value > 0.025)), ] %>%
+    tbl_df() %>% 
+    filter(origin_node %in% ind_actor_ids, destination_node %in% ind_actor_ids)
 
 # Load the donation data
 donation_file = '292888533329'
@@ -52,7 +66,7 @@ to_edgelist = function(network) {
 }
 directional_networks = lapply(directional.networks, to_edgelist)
 spatial_networks = lapply(spatial.networks, to_edgelist)
-netinf_network = netinf.network
+
 global_censoring_time = max(donation_data$integer_date)
 
 models = list('directional_networks' = directional_networks, 
