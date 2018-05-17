@@ -35,7 +35,6 @@ unlink(netinf_file_name)
 
 ## 0.025 p-value threshold
 netinf_network = out$netinf_out[1:min(which(out$netinf_out$p_value > 0.025)), ] %>%
-    tbl_df() %>% 
     filter(origin_node %in% ind_actor_ids, destination_node %in% ind_actor_ids)
 
 # Load the donation data
