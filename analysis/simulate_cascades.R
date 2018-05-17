@@ -1,66 +1,85 @@
 #devtools::install_github('desmarais-lab/NetworkInference')
 library(NetworkInference)
-library(boxr)
 library(tidyverse)
-library(ergm)
 
-box_auth()
-network_simulation_folder = '49466002727'
+## Function definitions
 
-# Load the simulated ergm networks
-ergm_sim_file = '292848476812'
-ergm_sim_file_name = 'ergm_simulation_results.RData'
-box_dl(ergm_sim_file)    
-load(ergm_sim_file_name)
-unlink(ergm_sim_file_name)
-
-# Load the inferred diffusion network
-netinf_file = '280757684849'
-netinf_file_name = 'netinf_threshold_8_iter_3.RData'
-box_dl(netinf_file)
-load(netinf_file_name)
-unlink(netinf_file_name)
-netinf.network = select(out$netinf_out, origin_node, destination_node)
-
-# Load the donation data
-donation_file = '292888533329'
-donation_file_name = 'data_for_netinf.csv'
-donation_data = box_read_csv(donation_file) %>% tbl_df()
-
-# Functions
-to_edgelist = function(network) {
-    el = as.edgelist(network)
-    vnames = attr(el, 'vnames')
-    out = as.data.frame(el) %>% 
-        mutate(origin_node = vnames[el[, 1]],
-               destination_node = vnames[el[, 2]]) %>%
-        select(-V1, -V2) %>%
-        tbl_df()
+subset_cascade_n <- function(cascade, ns) {
+    casc_length <- length(cascade$cascade_nodes)    
+    
+    subset_times <- lapply(1:casc_length, function(i) {
+        return(cascade$cascade_times[[i]][1:ns[i]])
+    }) 
+    subset_nodes <- lapply(1:casc_length, function(i) {
+        return(cascade$cascade_nodes[[i]][1:ns[i]])
+    }) 
+    names(subset_times) <- names(subset_nodes) <- names(cascade$cascade_times)
+    
+    subset_node_names <- cascade$node_names
+    out <- list(cascade_times = subset_times, cascade_nodes = subset_nodes,
+                node_names = subset_node_names)
+    class(out) <- c("cascade", "list")
     return(out)
 }
 
 
-# Get the donation data as used for netinf
-source('../data_processing/remove_isolates.R')
-donation_data = remove_isolates(donation_data, 8)
-full_cascades = as_cascade_long(donation_data, cascade_node_name = 'Donor_ID',
-                                cascade_id = 'Recip_ID', 
-                                event_time = 'integer_date')
+candidates = names(donation_cascades$cascade_nodes)[1:2]
 
-# For each candidate 1000 cascades from each model under all three conditions
-candidates = unique(donation_data$Recip_ID)
-diffmod_params = attr(netinf.network, 'diffusion_model_parameters')
-diffmod = attr(netinf.network, 'diffusion_model')
-general_cutoff_time = max(donation_data$integer_date)
+# Load required data
+load('../data/casc_sim_data.RData')
+
+# Get parameters from the netinf model
+diffmod_params = attr(models[['netinf_network']], 'diffusion_model_parameters')
+diffmod = attr(models[['netinf_network']], 'diffusion_model')
+
+for(candidate in candidates) {
+    
+    # Get just the candidate cascade
+    candidate_cascade = subset_cascade(donation_cascades, candidate)
+    min_time = min(candidate_cascade$cascade_times[[1]])
+
+    for(prop in c(0.05, 0.1, 0.2)) {
+        
+        # Generate the partial cascade 
+        n_observed = ceiling(length(candidate_cascade$cascade_times[[1]]) * prop)  
+        partial_cascade = subset_cascade_n(cascade = candidate_cascade,
+                                           ns = n_observed)
+         
+        for(i in 1:length(models)) {
+            model_name = names(models)[i]
+            diffnet = models[[i]]
+            
+            if(model_name = 'netinf_model') {
+                # Simulate 100 iterations from this network
+                out = simulate_cascades(diffnet, nsim = 100, 
+                                        max_time = global_censoring_time,
+                                        partial_cascade = partial_cascade,
+                                        params = diffmod_params, 
+                                        model = diffmod)
+            } else {
+                # Simulate 1 iteration from each of the 100 networks 
+                out = lapply(diffnet[1:20], simulate_cascades, nsim = 1, 
+                             max_time = 720, 
+                             partial_cascade = partial_cascade,
+                             params = diffmod_params,
+                             model = diffmod)
+                out = lapply(1:length(out), function(i) {
+                    x = out[[i]]
+                    x$cascade_id = i
+                    return(x)
+                })
+                out = do.call(rbind, out)
+            }
+        }   
+    }
+}
+
 
 # This function simulates n_sim cascades for each candidate based on the 
 # provided diffusion_network
-sim_cascade = function(diffusion_network, prop_observed, 
-                       cascades, params, diffmod, max_time, n_sim) {
+sim_cascade = function(diffusion_network, , 
+                       params, diffmod, max_time, n_sim) {
    
-    n_observed = sapply(cascades$cascade_times, function(x) {
-        round(length(x) * prop_observed, 0)  
-    })
     
     partial_cascades = subset_cascade_n(cascades, n_observed)
     casc_ids = names(partial_cascades$cascade_nodes)
@@ -89,20 +108,3 @@ sim_cascade = function(diffusion_network, prop_observed,
 # Batches of 1000: 808 * 3 * 3 * 3600 = 26179200 seconds = 303 days
 
     
-subset_cascade_n <- function(cascade, ns) {
-    casc_length <- length(cascade$cascade_nodes)    
-    
-    subset_times <- lapply(1:casc_length, function(i) {
-        return(cascade$cascade_times[[i]][1:ns[i]])
-    }) 
-    subset_nodes <- lapply(1:casc_length, function(i) {
-        return(cascade$cascade_nodes[[i]][1:ns[i]])
-    }) 
-    names(subset_times) <- names(subset_nodes) <- names(cascade$cascade_times)
-    
-    subset_node_names <- cascade$node_names
-    out <- list(cascade_times = subset_times, cascade_nodes = subset_nodes,
-                node_names = subset_node_names)
-    class(out) <- c("cascade", "list")
-    return(out)
-}
