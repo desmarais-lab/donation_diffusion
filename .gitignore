@@ -4,7 +4,6 @@ data/
 data
 db_credentials.py
 *.zip
-*.txt
 *.RData
 *.Rhistory
 *.DS_Store

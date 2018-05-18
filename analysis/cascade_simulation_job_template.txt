@@ -1,0 +1,13 @@
+#PBS -l nodes=1:ppn=1
+#PBS -l walltime=05:00:00
+#PBS -l pmem=3gb
+#PBS -j oe
+{queue}
+
+cd $PBS_O_WORKDIR
+module load R/3.4
+Rscript simulate_cascades.R {job_id} {n_per_job}
+
+# bbd5087_a_g_hc_default (40 cores)
+# bbd5087_a_g_sc_default (20 cores)
+# bbd5087_b_g_sc_default (20 cores)
