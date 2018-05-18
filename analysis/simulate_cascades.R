@@ -2,8 +2,10 @@
 library(NetworkInference)
 library(tidyverse)
 
-## Function definitions
+job_id = as.integer(commandArgs(trailingOnly = TRUE)[1])
+n_per_job = as.integer(commandArgs(trailingOnly = TRUE)[2])
 
+## Function definitions
 subset_cascade_n <- function(cascade, ns) {
     casc_length <- length(cascade$cascade_nodes)    
     
@@ -22,23 +24,33 @@ subset_cascade_n <- function(cascade, ns) {
     return(out)
 }
 
-
-candidates = names(donation_cascades$cascade_nodes)[1:2]
-
 # Load required data
 load('../data/casc_sim_data.RData')
+candidates = names(donation_cascades$cascade_nodes)
+start = (job_id - 1) * n_per_job + 1
+end = min(job_id * n_per_job, length(candidates))
+candidates = candidates[start:end]
+
+print(length(donation_cascades$node_names))
 
 # Get parameters from the netinf model
 diffmod_params = attr(models[['netinf_network']], 'diffusion_model_parameters')
 diffmod = attr(models[['netinf_network']], 'diffusion_model')
 
+n_per_mod = 100
+props = c(0.05, 0.1, 0.2)
+results = vector(mode = 'list', 
+                 length = length(candidates) * length(props) * length(models))
+
+set.seed(8567187)
+j = 1
 for(candidate in candidates) {
-    
+    start = Sys.time()
     # Get just the candidate cascade
     candidate_cascade = subset_cascade(donation_cascades, candidate)
     min_time = min(candidate_cascade$cascade_times[[1]])
 
-    for(prop in c(0.05, 0.1, 0.2)) {
+    for(prop in props) {
         
         # Generate the partial cascade 
         n_observed = ceiling(length(candidate_cascade$cascade_times[[1]]) * prop)  
@@ -49,62 +61,43 @@ for(candidate in candidates) {
             model_name = names(models)[i]
             diffnet = models[[i]]
             
-            if(model_name = 'netinf_model') {
+            if(model_name == 'netinf_network') {
                 # Simulate 100 iterations from this network
-                out = simulate_cascades(diffnet, nsim = 100, 
-                                        max_time = global_censoring_time,
+                out = simulate_cascades(diffnet, nsim = n_per_mod, 
+                                        max_time = Inf,
                                         partial_cascade = partial_cascade,
                                         params = diffmod_params, 
-                                        model = diffmod)
-            } else {
+                                        model = diffmod, 
+                                        nodes = donation_cascades$node_names)
+                out$network_type = model_name
+                out$proportion_observed = prop
+            } else if(model_name %in% c('directional_networks', 
+                                        'spatial_networks')) {
                 # Simulate 1 iteration from each of the 100 networks 
-                out = lapply(diffnet[1:20], simulate_cascades, nsim = 1, 
-                             max_time = 720, 
+                out = lapply(diffnet, simulate_cascades, 
+                             nsim = n_per_mod / length(diffnet), 
+                             max_time = Inf, 
                              partial_cascade = partial_cascade,
                              params = diffmod_params,
-                             model = diffmod)
+                             model = diffmod,
+                             nodes = donation_cascades$node_names)
                 out = lapply(1:length(out), function(i) {
                     x = out[[i]]
                     x$cascade_id = i
+                    x$network_type = model_name
+                    x$proportion_observed = prop
                     return(x)
                 })
                 out = do.call(rbind, out)
+            } else {
+                stop('unexpected model type')
             }
-        }   
+            results[[j]] = out
+            j = j + 1
+        }
     }
+    cat('Timing for candidate', candidate, ':', Sys.time() - start, '\n')
 }
 
-
-# This function simulates n_sim cascades for each candidate based on the 
-# provided diffusion_network
-sim_cascade = function(diffusion_network, , 
-                       params, diffmod, max_time, n_sim) {
-   
-    
-    partial_cascades = subset_cascade_n(cascades, n_observed)
-    casc_ids = names(partial_cascades$cascade_nodes)
-    
-    sim_out = lapply(casc_ids, function(x) {
-        s = Sys.time()
-        pc = subset_cascade(partial_cascades, x)
-        out = simulate_cascades(netinf.network, nsim = 1000, 
-                                partial_cascade = pc, 
-                                params = params, model = diffmod,
-                                max_time = max_time)
-        out$cascade_id = x
-        print(Sys.time() - s)
-        return(out)
-    }) 
-     
-}
-
-# Timings:
-# for 10: ~42s
-# for 1000: 
-
-# In chunks of 10 cascades per candidate with 42 seconds per candidate:
-# 808 candidates * 100 iterations of 10 * 3 partial cascade conditions * 3 models * 42 seconds:
-# Batches of 10: 808 * 100 * 3 * 3 * 42 = 30542400 seconds = 353 days
-# Batches of 1000: 808 * 3 * 3 * 3600 = 26179200 seconds = 303 days
-
-    
+fname = paste0('simulated_cascades_', job_id, '.RData')
+save(results, file = fname)

@@ -7,7 +7,6 @@ library(tidyverse)
 library(ergm)
 
 box_auth()
-network_simulation_folder = '49466002727'
 
 # Load the simulated ergm networks
 ergm_sim_file = '292848476812'
@@ -44,12 +43,12 @@ donation_data = box_read_csv(donation_file) %>% tbl_df()
 
 # Get the donation data as used for netinf
 source('../data_processing/remove_isolates.R')
-donation_data = remove_isolates(donation_data, 8)
+donation_data = remove_isolates(donation_data, 8) %>%
+    filter(Donor_ID %in% ind_actor_ids)
 donation_cascades = as_cascade_long(donation_data, 
                                     cascade_node_name = 'Donor_ID',
                                     cascade_id = 'Recip_ID', 
                                     event_time = 'integer_date')
-
 
 # Transform the ergm networks to edgelists
 to_edgelist = function(network) {
