@@ -8,7 +8,9 @@ def submit_job(job_id, template, queue, n_per_job):
     jobname = f'casc_sim_{job_id}'
     with open(jobname, 'w') as jobfile:
         jobfile.write(job)
-
+    
+    response = None
+    ntry = 0
     while response == None:
         try:
             ntry += 1
@@ -49,4 +51,6 @@ if __name__ == '__main__':
             q = f'#PBS -A {q_name}'
             submit_job(job_id, template, q, candidates_per_job)
             time.sleep(0.2)
+            break
+        break
 
