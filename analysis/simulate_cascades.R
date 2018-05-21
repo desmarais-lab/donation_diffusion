@@ -42,6 +42,11 @@ props = c(0.05, 0.1, 0.2)
 results = vector(mode = 'list', 
                  length = length(candidates) * length(props) * length(models))
 
+
+# TODO: If re-running this, store the candidate id in a column of the results
+# data frame
+stop("Fix the todo before running")
+
 set.seed(8567187)
 j = 1
 for(candidate in candidates) {
