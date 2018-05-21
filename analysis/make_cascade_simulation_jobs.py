@@ -51,6 +51,4 @@ if __name__ == '__main__':
             q = f'#PBS -A {q_name}'
             submit_job(job_id, template, q, candidates_per_job)
             time.sleep(0.2)
-            break
-        break
 

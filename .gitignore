@@ -6,4 +6,5 @@ db_credentials.py
 *.zip
 *.RData
 *.Rhistory
+casc_sim_*.o*
 *.DS_Store
