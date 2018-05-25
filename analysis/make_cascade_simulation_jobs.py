@@ -20,7 +20,6 @@ def submit_job(job_id, template, queue, n_per_job):
             # Raise exception and halt program after 5 unsuccesful tries 
             if ntry > 5:
                 raise
-                c -= 1
                 # Wait before re-trying
                 time.sleep(5)
                 pass
