@@ -99,5 +99,5 @@ for(candidate in candidates) {
     cat('Timing for candidate', candidate, ':', Sys.time() - start, '\n')
 }
 
-fname = paste0('simulated_cascades_', job_id, '.RData')
+fname = paste0('../data/cascade_simulation_results/simulated_cascades_', job_id, '.RData')
 save(results, file = fname)
