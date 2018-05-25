@@ -24,14 +24,35 @@ subset_cascade_n <- function(cascade, ns) {
     return(out)
 }
 
+sim_casc_out_degree = function(diffnet, nsim, params, model, nodes, 
+                               cand_cascade, n_observed) {
+   out_degrees = group_by(diffnet, origin_node) %>%
+       summarize(out_degree = n()) %>%
+       filter(origin_node %in% cand_cascade$cascade_nodes[[1]]) %>%
+       mutate(weight = out_degree / sum(out_degree))
+   
+   if(nrow(out_degrees) == 0) return(NULL) # all observed donors are isolates
+     
+   seed_nodes = sample(x = out_degrees$origin_node, 
+                       size = min(n_observed, length(out_degrees$origin_node)), 
+                       prob = out_degrees$weight, replace = FALSE)
+   partial_cascade = list(cascade_nodes = list(seed_nodes), 
+                          cascade_times = list(rep(0, length(seed_nodes))),
+                          node_names = nodes)
+   class(partial_cascade) = 'cascade'
+   
+   out = simulate_cascades(diffnet, nsim = nsim, partial_cascade = partial_cascade,
+                           params = params, model = model, nodes = nodes, 
+                           max_time = Inf)
+   return(out)
+}
+
 # Load required data
 load('../data/casc_sim_data.RData')
 candidates = names(donation_cascades$cascade_nodes)
 start = (job_id - 1) * n_per_job + 1
 end = min(job_id * n_per_job, length(candidates))
 candidates = candidates[start:end]
-
-print(length(donation_cascades$node_names))
 
 # Get parameters from the netinf model
 diffmod_params = attr(models[['netinf_network']], 'diffusion_model_parameters')
@@ -42,25 +63,19 @@ props = c(0.05, 0.1, 0.2)
 results = vector(mode = 'list', 
                  length = length(candidates) * length(props) * length(models))
 
-
-# TODO: If re-running this, store the candidate id in a column of the results
-# data frame
-stop("Fix the todo before running")
-
 set.seed(8567187)
 j = 1
 for(candidate in candidates) {
     start = Sys.time()
     # Get just the candidate cascade
     candidate_cascade = subset_cascade(donation_cascades, candidate)
-    min_time = min(candidate_cascade$cascade_times[[1]])
 
     for(prop in props) {
         
         # Generate the partial cascade 
         n_observed = ceiling(length(candidate_cascade$cascade_times[[1]]) * prop)  
-        partial_cascade = subset_cascade_n(cascade = candidate_cascade,
-                                           ns = n_observed)
+        #partial_cascade = subset_cascade_n(cascade = candidate_cascade,
+        #                                   ns = n_observed)
          
         for(i in 1:length(models)) {
             model_name = names(models)[i]
@@ -68,32 +83,42 @@ for(candidate in candidates) {
             
             if(model_name == 'netinf_network') {
                 # Simulate 100 iterations from this network
-                out = simulate_cascades(diffnet, nsim = n_per_mod, 
-                                        max_time = Inf,
-                                        partial_cascade = partial_cascade,
-                                        params = diffmod_params, 
-                                        model = diffmod, 
-                                        nodes = donation_cascades$node_names)
-                out$network_type = model_name
-                out$proportion_observed = prop
+                out = sim_casc_out_degree(diffnet = diffnet, nsim = n_per_mod, 
+                                          params = diffmod_params, 
+                                          model = diffmod, 
+                                          nodes = donation_cascades$node_names, 
+                                          cand_cascade = candidate_cascade, 
+                                          n_observed = n_observed)
+                if(!is.null(out)) {
+                    out$network_type = model_name
+                    out$proportion_observed = prop
+                    out$candidate = candidate                   
+                }
             } else if(model_name %in% c('directional_networks', 
                                         'spatial_networks')) {
                 # Simulate 1 iteration from each of the 100 networks 
-                out = lapply(diffnet, simulate_cascades, 
-                             nsim = n_per_mod / length(diffnet), 
-                             max_time = Inf, 
-                             partial_cascade = partial_cascade,
-                             params = diffmod_params,
-                             model = diffmod,
-                             nodes = donation_cascades$node_names)
-                out = lapply(1:length(out), function(i) {
-                    x = out[[i]]
-                    x$cascade_id = i
-                    x$network_type = model_name
-                    x$proportion_observed = prop
-                    return(x)
+                out = lapply(1:length(diffnet), function(k) {
+                    x = diffnet[[k]]
+                    o = sim_casc_out_degree(diffnet = x, 
+                                            nsim = n_per_mod / length(diffnet), 
+                                            params = diffmod_params, 
+                                            model = diffmod, 
+                                            nodes = donation_cascades$node_names, 
+                                            cand_cascade = candidate_cascade, 
+                                            n_observed = n_observed)
+                    if(!is.null(o)) {
+                        o$cascade_id = i
+                        o$network_type = model_name
+                        o$proportion_observed = prop
+                        o$candidate = candidate                      
+                    }
+                    return(o)
                 })
-                out = do.call(rbind, out)
+                # Remove NA outputs
+                names(out) = seq_along(out)
+                out = Filter(Negate(is.null), out)
+                if(length(out) > 0) out = do.call(rbind, out)
+                else out = NULL
             } else {
                 stop('unexpected model type')
             }
