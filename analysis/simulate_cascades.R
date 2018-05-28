@@ -77,7 +77,7 @@ for(candidate in candidates) {
         #partial_cascade = subset_cascade_n(cascade = candidate_cascade,
         #                                   ns = n_observed)
          
-        for(i in 1:length(models)) {
+        for(i in 1:2) {#length(models)) {
             model_name = names(models)[i]
             diffnet = models[[i]]
             
@@ -107,7 +107,7 @@ for(candidate in candidates) {
                                             cand_cascade = candidate_cascade, 
                                             n_observed = n_observed)
                     if(!is.null(o)) {
-                        o$cascade_id = i
+                        o$cascade_id = k
                         o$network_type = model_name
                         o$proportion_observed = prop
                         o$candidate = candidate                      
