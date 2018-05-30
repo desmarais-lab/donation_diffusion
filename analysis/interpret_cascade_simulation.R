@@ -9,7 +9,7 @@ SIM_RES_DIR = '../data/cascade_simulation_results/'
 
 # Load all simulation results
 
-outfiles = list.files(SIM_RES_DIR, patter = 'new_*')
+outfiles = list.files(SIM_RES_DIR, patter = '*.RData')
 i = 1
 for(f in outfiles) {
     load(paste0('../data/cascade_simulation_results/', f))
@@ -25,138 +25,168 @@ save(simulation_results,
 #load('../data/cascade_simulation_results/compiled_results.RData')
 cutoff_time = 17166
 
-a = group_by(simulation_results, network_type, proportion_observed, cascade_id, candidate_id) %>% summarize(n = n())
-tail(filter(a, network_type == "netinf_network") %>% arrange(candidate_id))
 
-# Look at the cascade lengths without the cutoff
-c_lengths = group_by(simulation_results, network_type, proportion_observed, 
-                     candidate_id, cascade_id) %>%
-    summarize(length = n())
-a = group_by(c_lengths, network_type, proportion_observed) %>%
-    summarize(length = mean(length))
-b = filter(simulation_results, event_time <= cutoff_time) %>%
-    group_by(network_type, proportion_observed, candidate_id, cascade_id) %>%
-    summarize(length = n()) %>%
-    group_by(network_type, proportion_observed) %>%
-    summarize(length = mean(length))
-out = left_join(a, b, by = c('network_type', 'proportion_observed'),
-                suffix = c('_no_cutoff', '_cutoff')) %>%
-    gather(condition, mean_length, -network_type, -proportion_observed)
-ggplot(out, aes(x = network_type, y = mean_length, 
-                shape = condition)) +
-    geom_point(size = 3) + pe$theme + scale_color_manual(values = pe$colors) +
-    facet_wrap(~proportion_observed) +
-    theme(axis.text.x = element_text(angle = 60, hjust = 1))
-ggsave('~/Dropbox/Public/average_cascade_length_all_candidates.png')
-
-
-# Join with candidate ideology data
-nominate_data = read_csv('../data/nominate_prez_data.csv') %>%
-    select(os_id, nominate_dim1)
-
-matched = filter(simulation_results, event_time <= cutoff_time) %>%
-    left_join(nominate_data, by = c('candidate_id' = 'os_id')) %>% 
-    filter(!is.na(nominate_dim1))
-
-c_lengths = group_by(matched, network_type, proportion_observed, 
-                     candidate_id, cascade_id) %>%
-    summarize(length = n())
-a = group_by(c_lengths, network_type, proportion_observed) %>%
-    summarize(length = mean(length))
-ggplot(a, aes(x = network_type, y = length)) +
-    geom_point(size = 3) + pe$theme + scale_color_manual(values = pe$colors) +
-    facet_wrap(~proportion_observed) +
-    theme(axis.text.x = element_text(angle = 60, hjust = 1))
-ggsave('~/Dropbox/Public/average_cascade_length_matched_candidates.png')
-
-
-# Check why cascades have different lengths
-## Function definitions
-subset_cascade_n <- function(cascade, ns) {
-    casc_length <- length(cascade$cascade_nodes)    
-    
-    subset_times <- lapply(1:casc_length, function(i) {
-        return(cascade$cascade_times[[i]][1:ns[i]])
-    }) 
-    subset_nodes <- lapply(1:casc_length, function(i) {
-        return(cascade$cascade_nodes[[i]][1:ns[i]])
-    }) 
-    names(subset_times) <- names(subset_nodes) <- names(cascade$cascade_times)
-    
-    subset_node_names <- cascade$node_names
-    out <- list(cascade_times = subset_times, cascade_nodes = subset_nodes,
-                node_names = subset_node_names)
-    class(out) <- c("cascade", "list")
-    return(out)
-}
-
+# ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+# Some descriptives on the simulation
+# ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 load('../data/casc_sim_data.RData')
+
+# Before restriction
+
+## Number of candidates completely dropped
 candidates = names(donation_cascades$cascade_nodes)
-prop = 0.05
-candidate = candidates[1]
-all_donors = donation_cascades$node_names
+sim_candidates = unique(simulation_results$candidate)
+dropped_candidates = candidates[which(!(candidates %in% sim_candidates))]
+length(dropped_candidates)
 
-   
-get_non_reachable = function(candidate, diffnet, all_donors) {
-    candidate_cascade = subset_cascade(donation_cascades, candidate)
-    n_observed = ceiling(length(candidate_cascade$cascade_times[[1]]) * prop)  
-    partial_cascade = subset_cascade_n(cascade = candidate_cascade,
-                                       ns = n_observed)
-    cat('Length part casc:', length(partial_cascade$cascade_nodes[[1]]), '\n')
+## Number of successfull simulations (a simulation is not successfull if the 
+## all seed nodes are isolates)
+n_sims = group_by(simulation_results, network_type, proportion_observed, 
+                   candidate) %>%
+    summarize(count = length(unique(cascade_id))) 
+ggplot(n_sims, aes(x = count)) +
+    geom_histogram(color = 'white') +
+    facet_wrap(~network_type)
 
-    netinf_edgelist = select(diffnet, origin_node, destination_node) %>%
-        as.matrix()
-    network = graph_from_edgelist(netinf_edgelist)
-    donors_in_network = vertex_attr(network)$name
-    
-    # For each donor in the partial cascade get donors that are non reachable 
-    paths = lapply(partial_cascade$cascade_nodes[[1]], function(x) {
-        p = try(get.shortest.paths(network, from = x), silent = TRUE)
-        if(inherits(p, 'try-error')) return(donors_in_network)
-        cannot_be_reached = which(unlist(lapply(p[[1]], length)) == 0)
-        out = donors_in_network[cannot_be_reached]
-        return(out)
-    })
-    non_reachable_by_all = Reduce(intersect, paths)
-    return(non_reachable_by_all)
+nsims %>%
+    group_by(network_type) %>%
+    summarize(average_n_simulations = mean(count),
+              median_n_simulations = median(count))
+
+## Average cascade length
+casc_lengths = group_by(simulation_results, network_type, proportion_observed, 
+                        cascade_id, candidate) %>% 
+    summarize(n = n()) %>%
+    group_by(network_type) %>%
+    summarize(average_cascade_length = mean(n),
+              median_cascade_length = median(n))
+
+# After restriction
+
+## Get total number of observed donations in the data
+n_donations = sum(sapply(donation_cascades$cascade_nodes, length))
+
+## For each simulated cascade cut off all donations made after n_donations is 
+## reached
+simulation_cut = group_by(simulation_results, network_type, proportion_observed,
+                          cascade_id) %>% 
+    arrange(network_type, proportion_observed, cascade_id, event_time) %>%
+    mutate(rank = row_number()) %>%
+    filter(rank < n_donations)
+
+# ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+# Number of donations by ideology, incumbency, network type and proportion observed
+# ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++   
+
+# Join with candidate ideology and incumbency data
+
+nominate_data = read_csv('../data/nominate_prez_data.csv') %>%
+    select(os_id, nominate_dim1) %>%
+    rename(candidate = os_id, ideology = nominate_dim1)
+
+candidate_meta_data = read_csv('../data/VLC_16_full.csv') %>% 
+    select(Actor_ID, Incum) %>%
+    rename(candidate = Actor_ID, incumbent = Incum) %>%
+    mutate(incumbent = ifelse(incumbent == "I", 1, 0))
+
+
+simulation_cut = left_join(simulation_cut, nominate_data) %>% 
+    left_join(candidate_meta_data)
+
+
+# Proportion of contributions to each decile of the ideology distribution
+n_breaks = 30
+matched = filter(simulation_cut, !is.na(ideology))
+matched$ideology_bin = cut(matched$ideology, breaks = n_breaks)
+
+pdat = group_by(matched, network_type, proportion_observed, ideology_bin, 
+                cascade_id) %>%
+    # get the proportion per ideology bin for each simulation iteration
+    summarize(n = n()) %>%
+    group_by(network_type, proportion_observed, cascade_id) %>%
+    mutate(prop = n / sum(n)) %>%
+    ## get mean, lo, hi accross simulation iterations
+    group_by(network_type, proportion_observed, ideology_bin) %>%
+    summarize(mean = mean(prop), 
+              lo = quantile(prop, 0.025), 
+              hi = quantile(prop, 0.975))
+
+## True donation distributon
+dd = as.data.frame(donation_cascades) %>%
+    left_join(nominate_data, by = c('cascade_id' = 'candidate')) %>%
+    left_join(candidate_meta_data, by = c('cascade_id' = 'candidate')) %>%
+    tbl_df() %>% 
+    filter(!is.na(ideology))
+dd$ideology_bin = cut(dd$ideology, breaks = n_breaks)
+dd = group_by(dd, ideology_bin) %>%
+    summarize(n = n(),
+              prop = n / nrow(.))
+i = 1
+for(p in unique(pdat$proportion_observed)) {
+    for(nt in unique(pdat$network_type)) {
+        if(i == 1) {
+            out = dd
+            out$proportion_observed = p
+            out$network_type = nt
+        } else {
+            x = dd
+            x$proportion_observed = p
+            x$network_type = nt
+            out = rbind(out, x)
+        }
+        i = i + 1
+    }
 }
+dd = out
 
-options(warn=-1)
-
-nw_type_idx = 2
-nw_type = names(models)[nw_type_idx]
-
-diffnet = models[[nw_type_idx]][[1]]
-donors_in_network = unique(c(diffnet$origin_node, diffnet$destination_node))
-
-for(candidate in candidates) {
-    sim_dat = filter(simulation_results, network_type == nw_type,
-                     proportion_observed == 0.05, candidate_id == candidate)
-    reached_donors = unique(sim_dat$node_name)
-    print(length(setdiff(reached_donors, donors_in_network)))
-    not_reachable = get_non_reachable(candidate, diffnet, all_donors)
-    #print(all(sort(setdiff(donors_in_network, reached_donors)) == sort(not_reachable)))
-}
-
-options(warn=0)
-
-
-# Number of contributions to candidates in each decile of nominate
-deciles = quantile(matched$nominate_dim1, seq(0, 1, 0.1))
-matched = mutate(matched, nominate_deciles = cut(nominate_dim1, deciles, 
-                                                 include.lowest = TRUE))
-
-pdat = group_by(matched, network_type, proportion_observed,
-                nominate_deciles, cascade_id, candidate_id) %>%
-    summarize(n_donations = n()) 
-    group_by(network_type, proportion_observed, nominate_deciles, cascade_id) %>%
-    summarize(average_length = mean(n_donations))
-    
-ggplot(pdat) + 
-    geom_boxplot(aes(x = nominate_deciles, y = average_length, 
-                     color = network_type)) +
-    facet_wrap(~proportion_observed) +
-    scale_color_manual(values = pe$colors) +
+ggplot(pdat, aes(x = ideology_bin, color = network_type)) +
+    geom_point(data = dd, aes(x = ideology_bin, y = prop), color = pe$colors[1],
+               alpha = 0.6, size = 1.5) +
+    geom_line(data = dd, aes(x = ideology_bin, y = prop, group = 1), 
+              color = pe$colors[1], alpha = 0.6) +
+    geom_point(aes(y = mean), size = 1.5) +
+    geom_segment(aes(y = lo, yend = hi, xend = ideology_bin)) +
+    facet_wrap(~network_type + proportion_observed) +
+    scale_color_manual(values = pe$colors[-1], guide = FALSE) +
     pe$theme +
-    theme(axis.text.x = element_text(angle = 60, hjust = 1))
-ggsave('~/Dropbox/Public/deciles.png', width = 16, height = 10)
+    theme(axis.text.x = element_blank(),
+          axis.ticks.x = element_blank()) +
+    ylab('Within group proportion') + xlab('Ideology')
+ggsave('~/Dropbox/Public/donations_ideology.png', width = 16, height = 10)
+
+
+# By incumbency status
+matched = filter(simulation_cut, !is.na(incumbent))
+
+pdat = group_by(matched, network_type, proportion_observed, incumbent, 
+                cascade_id) %>%
+    # get the proportion per ideology bin for each simulation iteration
+    summarize(n = n()) %>%
+    group_by(network_type, proportion_observed, cascade_id) %>%
+    mutate(prop = n / sum(n)) %>%
+    mutate(incumbent = as.factor(incumbent)) 
+    ## get mean, lo, hi accross simulation iterations
+    group_by(network_type, proportion_observed, incumbent) %>%
+    summarize(mean = mean(prop), 
+              lo = quantile(prop, 0.025), 
+              hi = quantile(prop, 0.975))
+
+## True donation distributon
+dd = as.data.frame(donation_cascades) %>%
+    left_join(nominate_data, by = c('cascade_id' = 'candidate')) %>%
+    left_join(candidate_meta_data, by = c('cascade_id' = 'candidate')) %>%
+    tbl_df() %>% 
+    filter(!is.na(incumbent)) %>%
+    group_by(incumbent) %>%
+    summarize(n = n(),
+              prop = n / nrow(.)) %>%
+    mutate(incumbent = as.factor(incumbent))
+
+ggplot(pdat, aes(x = network_type, y = prop, color = incumbent)) +
+    geom_boxplot() +
+    geom_hline(data = dd, aes(yintercept = prop, color = incumbent), 
+               linetype = 2) +
+    scale_color_manual(values = pe$colors, name = '', 
+                       labels = c('Challenger', 'Incumbent')) +
+    pe$theme + ylab('Proportion') + xlab('Network Type')
+ggsave('~/Dropbox/Public/donations_incumbent.png', width = 16, height = 10)
