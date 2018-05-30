@@ -5,24 +5,24 @@ library(NetworkInference)
 #devtools::install_github('flinder/flindR')
 pe = flindR::plot_elements()
 
-SIM_RES_DIR = '../data/cascade_simulation_results/'
-
-# Load all simulation results
-
-outfiles = list.files(SIM_RES_DIR, patter = '*.RData')
-i = 1
-for(f in outfiles) {
-    load(paste0('../data/cascade_simulation_results/', f))
-    if(i == 1) out = do.call(rbind, results)
-    else out = rbind(out, do.call(rbind, results))
-    i = i + 1 
-    print(i)
-}
-
-simulation_results = tbl_df(out)
-save(simulation_results, 
-     file = '../data/cascade_simulation_results/compiled_results.RData')
-#load('../data/cascade_simulation_results/compiled_results.RData')
+#SIM_RES_DIR = '../data/cascade_simulation_results/'
+#
+## Load all simulation results
+#
+#outfiles = list.files(SIM_RES_DIR, patter = '*.RData')
+#i = 1
+#for(f in outfiles) {
+#    load(paste0('../data/cascade_simulation_results/', f))
+#    if(i == 1) out = do.call(rbind, results)
+#    else out = rbind(out, do.call(rbind, results))
+#    i = i + 1 
+#    print(i)
+#}
+#
+#simulation_results = tbl_df(out)
+#save(simulation_results, 
+#     file = '../data/cascade_simulation_results/compiled_results.RData')
+load('../data/cascade_simulation_results/compiled_results.RData')
 cutoff_time = 17166
 
 
@@ -104,7 +104,7 @@ pdat = group_by(matched, network_type, proportion_observed, ideology_bin,
     # get the proportion per ideology bin for each simulation iteration
     summarize(n = n()) %>%
     group_by(network_type, proportion_observed, cascade_id) %>%
-    mutate(prop = n / sum(n)) %>%
+    mutate(prop = n / n_donations) %>%
     ## get mean, lo, hi accross simulation iterations
     group_by(network_type, proportion_observed, ideology_bin) %>%
     summarize(mean = mean(prop), 
@@ -120,7 +120,7 @@ dd = as.data.frame(donation_cascades) %>%
 dd$ideology_bin = cut(dd$ideology, breaks = n_breaks)
 dd = group_by(dd, ideology_bin) %>%
     summarize(n = n(),
-              prop = n / nrow(.))
+              prop = n / n_donations)
 i = 1
 for(p in unique(pdat$proportion_observed)) {
     for(nt in unique(pdat$network_type)) {
@@ -152,7 +152,7 @@ ggplot(pdat, aes(x = ideology_bin, color = network_type)) +
     theme(axis.text.x = element_blank(),
           axis.ticks.x = element_blank()) +
     ylab('Within group proportion') + xlab('Ideology')
-ggsave('~/Dropbox/Public/donations_ideology.png', width = 16, height = 10)
+ggsave('~/Dropbox/Public/donations_ideology_norm_by_all_donations.png', width = 16, height = 10)
 
 
 # By incumbency status
