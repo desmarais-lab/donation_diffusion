@@ -2,6 +2,8 @@ library(tidyverse)
 library(sna)
 library(igraph)
 library(NetworkInference)
+library(boxr)
+
 #devtools::install_github('flinder/flindR')
 pe = flindR::plot_elements()
 
@@ -84,8 +86,10 @@ nominate_data = read_csv('../data/nominate_prez_data.csv') %>%
     select(os_id, nominate_dim1) %>%
     rename(candidate = os_id, ideology = nominate_dim1)
 
-candidate_meta_data = read_csv('../data/VLC_16_full.csv') %>% 
-    select(Actor_ID, Incum) %>%
+box_auth()
+# Read 'VLC_16_full.csv' from box
+candidate_meta_data = box_read_csv(file_id = '255302928759', fread = TRUE) %>%
+    dplyr::select(Actor_ID, Incum) %>%
     rename(candidate = Actor_ID, incumbent = Incum) %>%
     mutate(incumbent = ifelse(incumbent == "I", 1, 0))
 
@@ -152,14 +156,14 @@ ggplot(pdat, aes(x = ideology_bin, color = network_type)) +
     theme(axis.text.x = element_blank(),
           axis.ticks.x = element_blank()) +
     ylab('Within group proportion') + xlab('Ideology')
-ggsave('~/Dropbox/Public/donations_ideology_norm_by_all_donations.png', width = 16, height = 10)
+ggsave('../paper/figures/donations_ideology_norm_by_all_donations.png', 
+       width = pe$p_width, height = 0.7 * pe$p_width)
 
 
 # By incumbency status
 matched = filter(simulation_cut, !is.na(incumbent))
 
-pdat = group_by(matched, network_type, proportion_observed, incumbent, 
-                cascade_id) %>%
+pdat = group_by(matched, network_type, proportion_observed, incumbent,  cascade_id) %>%
     # get the proportion per ideology bin for each simulation iteration
     summarize(n = n()) %>%
     group_by(network_type, proportion_observed, cascade_id) %>%
@@ -187,6 +191,8 @@ ggplot(pdat, aes(x = network_type, y = prop, color = incumbent)) +
     geom_hline(data = dd, aes(yintercept = prop, color = incumbent), 
                linetype = 2) +
     scale_color_manual(values = pe$colors, name = '', 
-                       labels = c('Challenger', 'Incumbent')) +
+                       labels = c('Non-Incumbent', 'Incumbent')) +
     pe$theme + ylab('Proportion') + xlab('Network Type')
-ggsave('~/Dropbox/Public/donations_incumbent.png', width = 16, height = 10)
+#ggsave('~/Dropbox/Public/donations_incumbent.png', width = 16, height = 10)
+ggsave('../paper/figures/donations_incumbent.png', 
+       width = pe$p_width, height = 0.7 * pe$p_width)

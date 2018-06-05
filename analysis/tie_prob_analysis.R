@@ -19,7 +19,6 @@ ergm_networks = do.call(rbind, out)
 donors_in_networks = unique(c(ergm_networks$origin_node, 
                               ergm_networks$destination_node))
 
-
 ## For each donor in the cascade find edges in networks with donors in 
 ## same cascade earlier
 count_relevant_edges_donor = function(i, cascade, networks) {
@@ -76,7 +75,15 @@ candidate_meta_data = box_read_csv(file_id = '255302928759', fread = TRUE) %>%
     mutate(incumbent = ifelse(incumbent == "I", 1, 0))
 
 resdat = left_join(proportions, nominate_data) %>% 
-    left_join(candidate_meta_data)
+    left_join(candidate_meta_data) 
+
+m = min(c(resdat$directional[resdat$directional != 0],
+          resdat$spatial[resdat$spatial != 0],
+          resdat$netinf[resdat$netinf != 0])) * 0.5
+resdat = mutate(resdat,
+                directional = ifelse(directional == 0, m, directional),
+                spatial = ifelse(spatial == 0, m, spatial),
+                netinf = ifelse(netinf == 0, m, netinf))
 
 ## By ideology
 pdat = filter(resdat, !is.na(ideology)) %>%
@@ -95,20 +102,24 @@ ggplot(pdat, aes(x = ideology_bin, color = type)) +
     pe$theme +
     theme(axis.text.x = element_blank(),
           axis.ticks.x = element_blank()) +
-    ylab('Proportion') + xlab('Ideology') +
-    scale_color_manual(values = pe$colors[-1], guide = FALSE)
-ggsave('~/Dropbox/Public/prop_explained_ideology.png', width = pe$p_width, 
+    ylab('Proportion Explained') + xlab('Ideology') +
+    scale_color_manual(values = pe$colors[-1], guide = FALSE) +
+    scale_y_log10()
+ggsave('../paper/figures/prop_explained_ideology.png', width = pe$p_width, 
        height = 0.7 * pe$p_width)
 
 ## By incumbency
 pdat = filter(resdat, !is.na(incumbent)) %>%
     dplyr::select(-ideology, -candidate) %>%
-    gather(type, proportion, -incumbent) 
+    gather(type, proportion, -incumbent) %>%
+    mutate(incumbent = ifelse(incumbent == 1, 'Incumbent', 'Non-Incumbent'))
   
 ggplot(pdat) +
     geom_boxplot(aes(x = as.factor(incumbent), y = proportion, color = type)) +
-    pe$theme +
-    scale_color_manual(values = pe$colors[-1]) +
-    xlab('Incumbent')
-ggsave('~/Dropbox/Public/prop_explained_incumbent.png', width = pe$p_width, 
+    pe$theme + scale_y_log10() +
+    scale_color_manual(values = pe$colors[-1], name = 'Network Model', 
+                       labels = c('Directional', 'Netinf', 'Spatial')) +
+    xlab('') + ylab('Proportion Explained')
+ggsave('~/Dropbox/Public/incumbent_log_filled.png')
+ggsave('../paper/figures/prop_explained_incumbent_log.png', width = pe$p_width, 
        height = 0.7 * pe$p_width)
