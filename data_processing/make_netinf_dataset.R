@@ -3,6 +3,7 @@ library(tidyverse)
 source('remove_isolates.R')
 
 infile <- '../data/EL_16.csv'
+year <- 2016
 date_low <- as.Date(paste0(as.character(year - 1), '-01-01'))
 date_high <- as.Date(paste0(as.character(year + 1), '-01-01'))
 
@@ -30,7 +31,10 @@ df <- df %>%
 # - Recipients with less than 2 unique donors
 # - Donors that give to only one candidate
 # - Iteratively remove them untill all isolates are gone:
-isolate_threshold <- 1
+isolate_threshold <- 8
 df <- remove_isolates(df, isolate_threshold)
 df$integer_date <- as.integer(df$Date)
 write_csv(df, '../data/data_for_netinf.R')
+
+
+
