@@ -77,13 +77,13 @@ candidate_meta_data = box_read_csv(file_id = '255302928759', fread = TRUE) %>%
 resdat = left_join(proportions, nominate_data) %>% 
     left_join(candidate_meta_data) 
 
-m = min(c(resdat$directional[resdat$directional != 0],
-          resdat$spatial[resdat$spatial != 0],
-          resdat$netinf[resdat$netinf != 0])) * 0.5
-resdat = mutate(resdat,
-                directional = ifelse(directional == 0, m, directional),
-                spatial = ifelse(spatial == 0, m, spatial),
-                netinf = ifelse(netinf == 0, m, netinf))
+#m = min(c(resdat$directional[resdat$directional != 0],
+#          resdat$spatial[resdat$spatial != 0],
+#          resdat$netinf[resdat$netinf != 0])) * 0.5
+#resdat = mutate(resdat,
+#                directional = ifelse(directional == 0, m, directional),
+#                spatial = ifelse(spatial == 0, m, spatial),
+#                netinf = ifelse(netinf == 0, m, netinf))
 
 ## By ideology
 pdat = filter(resdat, !is.na(ideology)) %>%
@@ -92,8 +92,8 @@ pdat = filter(resdat, !is.na(ideology)) %>%
     mutate(ideology_bin = cut(ideology, breaks = 30)) %>%
     group_by(type, ideology_bin) %>%
     summarize(mean = mean(proportion), 
-              lo = quantile(proportion, 0.025), 
-              hi = quantile(proportion, 0.975))
+              lo = t.test(proportion)$conf.int[1], 
+              hi = t.test(proportion)$conf.int[2])
 
 ggplot(pdat, aes(x = ideology_bin, color = type)) +
     geom_point(aes(y = mean), size = 1.5) +
@@ -112,14 +112,18 @@ ggsave('../paper/figures/prop_explained_ideology.png', width = pe$p_width,
 pdat = filter(resdat, !is.na(incumbent)) %>%
     dplyr::select(-ideology, -candidate) %>%
     gather(type, proportion, -incumbent) %>%
-    mutate(incumbent = ifelse(incumbent == 1, 'Incumbent', 'Non-Incumbent'))
+    mutate(incumbent = ifelse(incumbent == 1, 'Incumbent', 'Non-Incumbent')) %>%
+    group_by(type, incumbent) %>%
+    summarize(mean = mean(proportion),
+              lo = t.test(proportion)$conf.int[1],
+              hi = t.test(proportion)$conf.int[2])
   
-ggplot(pdat) +
-    geom_boxplot(aes(x = as.factor(incumbent), y = proportion, color = type)) +
+ggplot(pdat, aes(x = type, color = as.factor(incumbent))) +
+    geom_point(aes(y = mean)) +
+    geom_segment(aes(y = lo, yend = hi, xend = type)) +
     pe$theme + scale_y_log10() +
-    scale_color_manual(values = pe$colors[-1], name = 'Network Model', 
-                       labels = c('Directional', 'Netinf', 'Spatial')) +
+    scale_color_manual(values = pe$colors[-1], name = '') +
+    scale_x_discrete(labels = c('Directional', 'Netinf', 'Spatial')) +
     xlab('') + ylab('Proportion Explained')
-ggsave('~/Dropbox/Public/incumbent_log_filled.png')
-ggsave('../paper/figures/prop_explained_incumbent_log.png', width = pe$p_width, 
+ggsave('../paper/figures/prop_explained_incumbent.png', width = pe$p_width, 
        height = 0.7 * pe$p_width)
