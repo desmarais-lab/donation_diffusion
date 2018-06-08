@@ -15,7 +15,7 @@ donors = entities %>%
 
 candidates = entities %>%
     filter(Ent_Typ == 'CAND') %>%
-    select(Actor_ID, Party_PAC_Type)
+    select(Actor_ID, Party_PAC_Type, Incum)
 
 # Load the cascade data 'Strategic_Donors/Data/data_for_netinf.R' from box
 donations = box_read_csv(file_id = '292888533329') %>% 
@@ -43,8 +43,6 @@ n_donations = group_by(donations, Recip_ID) %>%
 donations = left_join(donations, n_donations) %>%
     mutate(normalized_rank = rank / n_donations)
 
-
-
 # Join with the candidate data for plotting
 donations = left_join(donations, candidates, by = c('Recip_ID' = 'Actor_ID')) %>%
     filter(is.element(Party_PAC_Type, c('D', 'R')))
@@ -63,3 +61,5 @@ ggplot(donations, aes(x = ideology, y = normalized_rank,
     scale_color_manual(values = pe$colors[-1], name = "Party")
 ggsave('../paper/figures/donation_rank.png', width = pe$p_width, 
        height = 0.7 * pe$p_width)
+
+# Separate for incumbents and non-incumbents
