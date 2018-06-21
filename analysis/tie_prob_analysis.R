@@ -63,11 +63,12 @@ count_relevant_edges_cascade = function(cascade, networks) {
 #save(proportions, file = 'edge_proportions_cache.RData')
 load('edge_proportions_cache.RData')
 
-nominate_data = read_csv('../data/nominate_prez_data.csv') %>%
+box_auth()
+# Load '/Data/nominate_prez_data.csv' from box
+nominate_data = box_read_csv(file_id = '296211662898') %>%
     dplyr::select(os_id, nominate_dim1) %>%
     rename(candidate = os_id, ideology = nominate_dim1)
-
-box_auth()
+  
 # Read 'VLC_16_full.csv' from box
 candidate_meta_data = box_read_csv(file_id = '255302928759', fread = TRUE) %>%
     dplyr::select(Actor_ID, Incum) %>%
@@ -85,6 +86,13 @@ resdat = left_join(proportions, nominate_data) %>%
 #                spatial = ifelse(spatial == 0, m, spatial),
 #                netinf = ifelse(netinf == 0, m, netinf))
 
+conf_int = function(x, lo = TRUE) {
+    idx = ifelse(lo, 1, 2)
+    out = try(t.test(x)$conf.int[idx], silent = TRUE)
+    if(inherits(out, 'try-error')) return(NA)
+    return(out)
+}
+
 ## By ideology
 pdat = filter(resdat, !is.na(ideology)) %>%
     dplyr::select(-incumbent, -candidate) %>%
@@ -92,8 +100,9 @@ pdat = filter(resdat, !is.na(ideology)) %>%
     mutate(ideology_bin = cut(ideology, breaks = 30)) %>%
     group_by(type, ideology_bin) %>%
     summarize(mean = mean(proportion), 
-              lo = t.test(proportion)$conf.int[1], 
-              hi = t.test(proportion)$conf.int[2])
+              lo = conf_int(proportion), 
+              hi = conf_int(proportion, lo = FALSE)) %>%
+    filter(!is.na(lo)) # a few (16) ideology bins have only 1 observation
 
 ggplot(pdat, aes(x = ideology_bin, color = type)) +
     geom_point(aes(y = mean), size = 1.5) +
@@ -103,8 +112,7 @@ ggplot(pdat, aes(x = ideology_bin, color = type)) +
     theme(axis.text.x = element_blank(),
           axis.ticks.x = element_blank()) +
     ylab('Proportion Explained') + xlab('Ideology') +
-    scale_color_manual(values = pe$colors[-1], guide = FALSE) +
-    scale_y_log10()
+    scale_color_manual(values = pe$colors[-1], guide = FALSE) 
 ggsave('../paper/figures/prop_explained_ideology.png', width = pe$p_width, 
        height = 0.7 * pe$p_width)
 
