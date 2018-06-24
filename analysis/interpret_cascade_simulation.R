@@ -184,14 +184,15 @@ dd = as.data.frame(donation_cascades) %>%
               prop = n / nrow(.)) %>%
     mutate(incumbent = as.factor(incumbent))
 
-ggplot(pdat, aes(x = network_type, y = prop, color = incumbent)) +
+ggplot(pdat, aes(x = network_type, y = prop, color = incumbent,
+                 linetype = incumbent)) +
     geom_boxplot() +
     geom_hline(data = dd, aes(yintercept = prop, color = incumbent), 
                linetype = 2) +
     scale_color_manual(values = pe$colors, name = '', 
                        labels = c('Non-Incumbent', 'Incumbent')) +
+    scale_linetype(name = "", labels = c('Non-Incumbent', 'Incumbent')) +
     pe$theme + ylab('Proportion') + xlab('Network Type') +
     facet_wrap(~proportion_observed)
-#ggsave('~/Dropbox/Public/donations_incumbent.png', width = 16, height = 10)
 ggsave('../paper/figures/donations_incumbent.png', 
        width = pe$p_width, height = 0.7 * pe$p_width)

@@ -58,7 +58,7 @@ donations$incumbent = ifelse(donations$Incum == "I", "Incumbent", "Non-Incumbent
 donations = filter(donations, !is.na(incumbent))
 
 ggplot(donations, aes(x = ideology, y = normalized_rank, 
-                      color = Party_PAC_Type)) +
+                      color = Party_PAC_Type, linetype = Party_PAC_Type)) +
     geom_jitter(alpha = 0.1, size = 0.1) +
     #geom_point(alpha = 0.1, size = 0.1) +
     geom_smooth() +
@@ -66,6 +66,8 @@ ggplot(donations, aes(x = ideology, y = normalized_rank,
     scale_color_manual(values = c('#4286f4', '#f44141'), 
                        name = "Recipient\nParty",
                        labels = c("Democrat", 'Republican')) +
+    scale_linetype(name = "Recipient\nParty",
+                   labels = c("Democrat", "Republican")) +
     facet_wrap(~incumbent)
 ggsave('../paper/figures/donation_rank.png', width = pe$p_width, 
        height = 0.7 * pe$p_width)
