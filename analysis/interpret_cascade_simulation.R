@@ -52,9 +52,9 @@ n_sims = group_by(simulation_results, network_type, proportion_observed,
     summarize(count = length(unique(cascade_id))) 
 ggplot(n_sims, aes(x = count)) +
     geom_histogram(color = 'white') +
-    facet_wrap(~network_type)
+    facet_wrap(~network_type, scales = "free")
 
-nsims %>%
+n_sims %>%
     group_by(network_type) %>%
     summarize(average_n_simulations = mean(count),
               median_n_simulations = median(count))
@@ -84,23 +84,21 @@ simulation_cut = group_by(simulation_results, network_type, proportion_observed,
 # Number of donations by ideology, incumbency, network type and proportion observed
 # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++   
 
-# Join with candidate ideology and incumbency data
-
-nominate_data = read_csv('../data/nominate_prez_data.csv') %>%
+## Join with candidate ideology and incumbency data
+box_auth()
+# Read 
+nominate_data = box_read_csv(file_id = '291617511779') %>%
     select(os_id, nominate_dim1) %>%
     rename(candidate = os_id, ideology = nominate_dim1)
 
-box_auth()
 # Read 'VLC_16_full.csv' from box
 candidate_meta_data = box_read_csv(file_id = '255302928759', fread = TRUE) %>%
     dplyr::select(Actor_ID, Incum) %>%
     rename(candidate = Actor_ID, incumbent = Incum) %>%
     mutate(incumbent = ifelse(incumbent == "I", 1, 0))
 
-
 simulation_cut = left_join(simulation_cut, nominate_data) %>% 
     left_join(candidate_meta_data)
-
 
 # Proportion of contributions to each decile of the ideology distribution
 n_breaks = 30
@@ -167,17 +165,13 @@ ggsave('../paper/figures/donations_ideology_norm_by_all_donations.png',
 # By incumbency status
 matched = filter(simulation_cut, !is.na(incumbent))
 
-pdat = group_by(matched, network_type, proportion_observed, incumbent,  cascade_id) %>%
+pdat = group_by(matched, network_type, proportion_observed, incumbent,  
+                cascade_id) %>%
     # get the proportion per ideology bin for each simulation iteration
     summarize(n = n()) %>%
     group_by(network_type, proportion_observed, cascade_id) %>%
     mutate(prop = n / sum(n)) %>%
     mutate(incumbent = as.factor(incumbent)) 
-    ## get mean, lo, hi accross simulation iterations
-    group_by(network_type, proportion_observed, incumbent) %>%
-    summarize(mean = mean(prop), 
-              lo = quantile(prop, 0.025), 
-              hi = quantile(prop, 0.975))
 
 ## True donation distributon
 dd = as.data.frame(donation_cascades) %>%
@@ -196,7 +190,8 @@ ggplot(pdat, aes(x = network_type, y = prop, color = incumbent)) +
                linetype = 2) +
     scale_color_manual(values = pe$colors, name = '', 
                        labels = c('Non-Incumbent', 'Incumbent')) +
-    pe$theme + ylab('Proportion') + xlab('Network Type')
+    pe$theme + ylab('Proportion') + xlab('Network Type') +
+    facet_wrap(~proportion_observed)
 #ggsave('~/Dropbox/Public/donations_incumbent.png', width = 16, height = 10)
 ggsave('../paper/figures/donations_incumbent.png', 
        width = pe$p_width, height = 0.7 * pe$p_width)
