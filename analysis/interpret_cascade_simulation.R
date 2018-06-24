@@ -14,16 +14,20 @@ pe = flindR::plot_elements()
 #outfiles = list.files(SIM_RES_DIR, patter = '*.RData')
 #i = 1
 #for(f in outfiles) {
+#    cat(i, f, '\n')
+#    if(f == 'compiled_results.RData') next
 #    load(paste0('../data/cascade_simulation_results/', f))
 #    if(i == 1) out = do.call(rbind, results)
 #    else out = rbind(out, do.call(rbind, results))
 #    i = i + 1 
-#    print(i)
 #}
 #
 #simulation_results = tbl_df(out)
 #save(simulation_results, 
 #     file = '../data/cascade_simulation_results/compiled_results.RData')
+#
+#stop()
+
 load('../data/cascade_simulation_results/compiled_results.RData')
 cutoff_time = 17166
 
