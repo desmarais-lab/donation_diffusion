@@ -71,3 +71,18 @@ ggplot(donations, aes(x = ideology, y = normalized_rank,
     facet_wrap(~incumbent)
 ggsave('../paper/figures/donation_rank.png', width = pe$p_width, 
        height = 0.7 * pe$p_width)
+
+
+# Donor ideology and donations to incumbents 
+donations$incumbent_b = ifelse(donations$incumbent == "Incumbent", 1, 0)
+ggplot(donations, aes(x = ideology, y = incumbent_b, color = Party_PAC_Type,
+                      linetype = Party_PAC_Type)) +
+    geom_smooth() +
+    xlab('Donor Ideology') + ylab('Proportion Incumbent') +
+    scale_color_manual(values = c('#4286f4', '#f44141'), 
+                       name = "Recipient\nParty",
+                       labels = c("Democrat", 'Republican')) +
+    scale_linetype(name = "Recipient\nParty",
+                   labels = c("Democrat", "Republican")) +
+    pe$theme + ylim(0,1) 
+ggsave('~/Dropbox/Public/donor_ideology_candidate_incumbency.png')
