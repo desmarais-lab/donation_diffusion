@@ -1,10 +1,12 @@
 library(tidyverse)
+library(boxr)
 
-year <- 2016
-setwd("~/Box Sync/Strategic_Donors")
-infile <- paste0('./data/EL_', substr(as.character(year), 3, 4), '.csv')
+# Read 'data/EL_16.csv' from box
+box_auth()
+df = box_read_csv(file_id = '272572708618', fread = TRUE)
 date_low <- as.Date(paste0(as.character(year - 1), '-01-01'))
 date_high <- as.Date(paste0(as.character(year + 1), '-01-01'))
+
 ## This mirrors the first pre processing step in network_inference.R
 df <- read_csv(infile) %>%
   select(Donor_ID, Recip_ID, Amt, Tran_Tp, Recip_Tp, Date, Donor_Tp) %>%

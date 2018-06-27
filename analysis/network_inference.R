@@ -11,23 +11,29 @@ init_params = 0.012
 
 # Read the preprocessed data (see `make_netinf_data.R` for details)
 cat('threshold: ', isolate_threshold, '\n')
-df <- read_csv('../data/data_for_netinf.csv')
+df <- read_csv('../data/data_for_netinf.R')
 df <- remove_isolates(df, isolate_threshold)
 
-## Descriptives
-n_donors <- length(unique(df$Donor_ID))
-n_recips <- length(unique(df$Recip_ID))
-cat(paste0('Number of donors: ', n_donors, '\n'))
-cat(paste0('Number of recipients: ', n_recips, '\n'))
-cat(paste0('Number of donations: ', nrow(df), '\n'))
+cat('Number of donors', length(unique(df$Donor_ID)), '\n')
 
 # Fit the network
 cascades <- as_cascade_long(df, cascade_node_name = 'Donor_ID', 
                             event_time = 'integer_date', 
                             cascade_id = 'Recip_ID')
 
-res = netinf(cascades, params = init_params, max_iter = 1, n_edges = 10000)
-
-# Estimate lambda from the diffusion times in the estimated trees
-output <- list('network' = res$net, 'data' = df)
-save(output, file = paste0('../data/results/', n_nodes, 'donors.RData'))
+iter = 1
+while(TRUE) {
+    res = netinf(cascades, params = init_params, max_iter = 1)
+    converged = attr(res, 'converged')
+    out = list('netinf_out' = res, 'iteration' = iter,
+               'converged' = converged)
+    save(out, file = paste0('../data/results/netinf_threshold_', 
+                            isolate_threshold, '_iter_', iter, '.RData'))   
+    if(converged) break
+    else init_params = attr(res, "diffusion_model_parameters")
+    iter = iter + 1
+    if(iter > 10) {
+        print('Stopping without convergence')
+        break
+    }
+}
