@@ -1,17 +1,13 @@
-devtools::install_github('desmarais-lab/NetworkInference')
-
 library(tidyverse)
 library(NetworkInference)
-library(microbenchmark)
+library(boxr)
 source('../data_processing/remove_isolates.R')
 
-args = commandArgs(trailingOnly=TRUE)
-isolate_threshold = as.integer(args[1])
+isolate_threshold = 8
 init_params = 0.012
 
-# Read the preprocessed data (see `make_netinf_data.R` for details)
-cat('threshold: ', isolate_threshold, '\n')
-df <- read_csv('../data/data_for_netinf.R')
+# Read 'data/data_for_netinf.RData' from box see `make_netinf_data.R` for details
+df <- box_read_csv(file_id = '292888533329')
 df <- remove_isolates(df, isolate_threshold)
 
 cat('Number of donors', length(unique(df$Donor_ID)), '\n')
@@ -23,7 +19,8 @@ cascades <- as_cascade_long(df, cascade_node_name = 'Donor_ID',
 
 iter = 1
 while(TRUE) {
-    res = netinf(cascades, params = init_params, max_iter = 1)
+    res = netinf(cascades, trans_mod = 'exponential', params = init_params, 
+                 p_value_cutoff = 0.05)
     converged = attr(res, 'converged')
     out = list('netinf_out' = res, 'iteration' = iter,
                'converged' = converged)

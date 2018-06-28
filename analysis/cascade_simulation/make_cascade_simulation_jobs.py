@@ -37,7 +37,7 @@ if __name__ == '__main__':
     n_candidates = 740
     candidates_per_job = 10
 
-    with open('cascade_simulation_job_template.txt') as infile:
+    with open('cascade_simulation_job_template.pbs') as infile:
         template = infile.read()
     
     job_id = 0

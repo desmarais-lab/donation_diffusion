@@ -1,9 +1,16 @@
+# This script generates analyses that are based directly on the raw donation
+# data:
+#
+# - Figure of normalized donation rank by donor ideology and recipient party
+# - Figure of proportion of donations to incumbent/non-incument by donor 
+#   ideology and recipient party
+
 library(boxr)
 library(tidyverse)
 #devtools::install_github('flinder/flindR')
 library(flindR) # For plotting theme
-pe = plot_elements()
 
+pe = plot_elements()
 box_auth()
 
 # Load 'Strategic_Donors/2016_data_match/VLC_16_full.csv' from box
@@ -43,24 +50,24 @@ n_donations = group_by(donations, Recip_ID) %>%
 donations = left_join(donations, n_donations) %>%
     mutate(normalized_rank = rank / n_donations)
 
-# Join with the candidate data for plotting
+## Join with the candidate data for plotting
 donations = left_join(donations, candidates, by = c('Recip_ID' = 'Actor_ID')) %>%
     filter(is.element(Party_PAC_Type, c('D', 'R')))
 
-# Convert the ideology bins to numeric values by assigning values uniformly 
-# random between the end points of the bin
+## Convert the ideology bins to numeric values by assigning values uniformly 
+## random between the end points of the bin
 splt = strsplit(donations$ideology, '–')
 a = sapply(splt, function(x) runif(1, as.numeric(x)[1], as.numeric(x)[2]))
 donations$ideology = a
 
-# Separate for incumbents and non-incumbents
+## Separate for incumbents and non-incumbents
 donations$incumbent = ifelse(donations$Incum == "I", "Incumbent", "Non-Incumbent")
 donations = filter(donations, !is.na(incumbent))
+donations$ideology = donations$ideology - 50
 
 ggplot(donations, aes(x = ideology, y = normalized_rank, 
                       color = Party_PAC_Type, linetype = Party_PAC_Type)) +
     geom_jitter(alpha = 0.1, size = 0.1) +
-    #geom_point(alpha = 0.1, size = 0.1) +
     geom_smooth() +
     pe$theme + xlab('Donor Ideology') + ylab('Normalized Donation Rank') +
     scale_color_manual(values = c('#4286f4', '#f44141'), 
@@ -85,4 +92,6 @@ ggplot(donations, aes(x = ideology, y = incumbent_b, color = Party_PAC_Type,
     scale_linetype(name = "Recipient\nParty",
                    labels = c("Democrat", "Republican")) +
     pe$theme + ylim(0,1) 
-ggsave('~/Dropbox/Public/donor_ideology_candidate_incumbency.png')
+ggsave('../paper/figures/donor_ideology_candidate_incumbency.png', 
+       width = pe$p_width, 
+       height = 0.7 * pe$p_width)
