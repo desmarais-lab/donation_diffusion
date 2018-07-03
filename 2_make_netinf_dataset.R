@@ -1,17 +1,14 @@
 library(tidyverse)
+library(boxr)
 
 source('remove_isolates.R')
 
-infile <- '../data/EL_16.csv'
-year <- 2016
-date_low <- as.Date(paste0(as.character(year - 1), '-01-01'))
-date_high <- as.Date(paste0(as.character(year + 1), '-01-01'))
+# Read 'EL_16.csv' from box
+df = box_read_csv(file_id = '302149820582')
+date_low = as.Date('2015-01-01')
+date_high = as.Date('2017-01-01')
 
-df <- read_csv(infile)
-nrow_initial <- nrow(df)
-
-df <- df %>%
-    select(Donor_ID, Recip_ID, Amt, Tran_Tp, Recip_Tp, Date, Donor_Tp) %>%
+df = select(df, Donor_ID, Recip_ID, Amt, Tran_Tp, Recip_Tp, Date, Donor_Tp) %>%
     # Remove rows with missing data
     na.omit() %>%
     mutate(Date = as.Date(Date, '%m/%d/%Y')) %>%
@@ -28,13 +25,12 @@ df <- df %>%
     filter(row_number() == 1)
 
 # Subset the data. Remove:
-# - Recipients with less than 2 unique donors
-# - Donors that give to only one candidate
-# - Iteratively remove them untill all isolates are gone:
-isolate_threshold <- 8
-df <- remove_isolates(df, isolate_threshold)
-df$integer_date <- as.integer(df$Date)
-write_csv(df, '../data/data_for_netinf.R')
+# - Recipients with less than 8 unique donors
+# - Donors that give to less than 8 candidates
+# - Iteratively remove them untill all (8-)isolates are gone:
+df = remove_isolates(df, threshold = 8)
+df$integer_date = as.integer(df$Date)
 
-
-
+## Write files to box in dir 'Strategic_Donors/final_paper_data/'
+box_write(df, filename = 'data_for_netinf.csv', write_fun = write_csv, 
+          dir_id = '50855821402')
