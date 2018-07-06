@@ -1,0 +1,3 @@
+ISOLATE_THRESHOLD: 8
+P_VALUE: 0.05
+data_for_netinf_threshold_8.csv: '318903729920'
