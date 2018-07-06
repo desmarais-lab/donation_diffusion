@@ -1,10 +1,13 @@
 library(tidyverse)
 library(boxr)
+library(yaml)
 
 source('remove_isolates.R')
 
+config = yaml.load_file('0_config.yml')
+
 # Read 'EL_16.csv' from box
-df = box_read_csv(file_id = '302149820582')
+df = box_read_csv(file_id = '302149820582', fread = TRUE)
 date_low = as.Date('2015-01-01')
 date_high = as.Date('2017-01-01')
 
@@ -28,9 +31,15 @@ df = select(df, Donor_ID, Recip_ID, Amt, Tran_Tp, Recip_Tp, Date, Donor_Tp) %>%
 # - Recipients with less than 8 unique donors
 # - Donors that give to less than 8 candidates
 # - Iteratively remove them untill all (8-)isolates are gone:
-df = remove_isolates(df, threshold = 8)
+df = remove_isolates(df, threshold = config$ISOLATE_THRESHOLD)
 df$integer_date = as.integer(df$Date)
 
 ## Write files to box in dir 'Strategic_Donors/final_paper_data/'
-box_write(df, filename = 'data_for_netinf.csv', write_fun = write_csv, 
-          dir_id = '50855821402')
+fname = paste0('data_for_netinf_threshold_', config$ISOLATE_THRESHOLD, '.csv')
+ref = box_write(df, filename = fname, write_fun = write_csv, 
+                dir_id = '50855821402')
+## Store file reference (file_id) in config for downstream scripts
+config[[fname]] = ref$file_version$id
+
+## Write config
+write_yaml(config, file = '0_config.yml')

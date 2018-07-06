@@ -8,11 +8,11 @@ library(ergm)
 library(tidyverse)
 library(boxr)
 
-P_VALUE = 0.025
+P_VALUE = 0.05
 ISOLATE_THRESHOLD = 8
 box_auth()
 
-# Read  
+# Read the netinf network
 netinf_network = box_read_csv(file_id = '302555400385')
 
 # Read 'data_for_netinf.csv' from box
@@ -79,6 +79,7 @@ set.vertex.attribute(individual.network, "ideology.numeric",
                      ideology.interval.start)
 
 individual.network.narm = individual.network
+
 delete.vertices(individual.network.narm,
                 which(is.na(ideology.interval.start)))
     
@@ -104,9 +105,11 @@ diffun <- function(i,j){
 ### Estimate the ERGMs
 set.seed(123)
 mod = individual.network.narm ~ mutual + 
-                                transitiveties+gwidegree(0.5,fixed=T) + 
+                                transitiveties +
+                                gwidegree(0.5,fixed=T) + 
                                 gwodegree(0.5,fixed=T) +
-                                edges+nodematch("state") + 
+                                edges +
+                                nodematch("state") + 
                                 nodematch("cd") + 
                                 edgecov(abs(ideoi-ideoj)) + 
                                 edgecov(ideoi) + 
@@ -144,7 +147,9 @@ full.ideology.ergm = ergm(mod, control = control.ergm(MCMC.samplesize = 10000))
 ## Write files to box in dir 'Strategic_Donors/final_paper_data/'
 out = list(simple.homophily.ergm = simple.homophily.ergm, 
            ideological.hierarchy.ergm = ideological.hierarchy.ergm, 
-           full.ideology.ergm = full.ideology.ergm)
+           full.ideology.ergm = full.ideology.ergm,
+           individual.network.narm = individual.network.narm,
+           ideoi = ideoi, ideoj = ideoj, diffun = diffun)
 fname = paste0('ergm_results_', ISOLATE_THRESHOLD, '_pval_', P_VALUE, '.RData')
 box_write(out, filename = fname, dir_id = '50855821402')
     
