@@ -4,6 +4,10 @@ library(readr)
 
 box_auth()
 
+# Config:
+LOCAL_DATA = 'data/'
+#LOCAL_DATA = NULL
+
 ##################
 ## Cand/PAC Info - create vertex level data
 #################
@@ -12,25 +16,38 @@ box_auth()
 c_names = c("Year", "ID", "CID", "Name", "Party", "District", "Current_Dist", 
           "Active", "Active2", "Incum_Won", "Party_Won", "NoPacs")
 ## Read 'cands16.txt' from box
-cands = box_read(file_id = '302056263793', read_fun = read_delim, delim = ',',
-                 col_names = c_names, quote = '|')
+if(!is.null(LOCAL_DATA)) {
+   cands = read_delim(paste0(LOCAL_DATA, 'cands16.txt'), delim = ',', 
+                      quote = '|', col_names = c_names) 
+} else {
+    cands = box_read(file_id = '302056263793', read_fun = read_delim, delim = ',',
+                     col_names = c_names, quote = '|')
+}
 
 cands$won = substr(cands$Party_Won, 2, 2)
   
 ## only retain year, cmte ID, cand ID, name, party, district, incumbency/winner
-cands = cands[, c(1:6, 10, 13)]
+cands = select(cands, Year, ID, CID, Name, Party, District, Incum_Won, won)
   
 ## party - change all 3rd party to 3
 cands$Party[!cands$Party %in% c("D", "R", "I")] = "3"
   
 # Supplement missing incumbency data
 ## Read 'cn16_fec.txt' from box
-yy = box_read(file_id = '302057933693', read_fun = read_delim, delim = '|',
-              col_names = FALSE)
-cands$Incum_Won[!cands$Incum_Won %in% c("C", "I", "O")] = NA
-cands$Incum_Won = ifelse(is.na(cands$Incum_Won),
-                         as.character(yy$X8[match(cands$ID, yy$X1)]),
-                         as.character(cands$Incum_Won))
+if(!is.null(LOCAL_DATA)) {
+    yy = read_delim(paste0(LOCAL_DATA, 'cn16_fec.txt'), delim = '|', 
+                    col_names = FALSE)
+} else {
+    yy = box_read(file_id = '302057933693', read_fun = read_delim, delim = '|',
+                  col_names = FALSE)   
+}
+
+# in yy X1 is candidate ID and X8 is incumbency info
+cands = select(yy, X1, X8) %>%
+    right_join(cands, by = c('X1' = 'ID')) %>%
+    mutate(Incum_Won = ifelse(is.na(Incum_Won), X8, Incum_Won)) %>%
+    rename(ID = X1) %>%
+    select(-X8)
 rm(yy)
   
 # PACS
@@ -38,12 +55,17 @@ c_names  = c("Year", "ID", "Name", "Affiliate", "Parent_Org", "RID", "R_Type",
              "CID", "Party", "Industry", "Source", "Multi_Industry", "Foreign", 
              "Active")
 ## Read 'cmtes16.txt' from box
-cmtes = box_read(file_id = '302061819630', read_fun = read_delim, delim = ',',
-                 quote = '|', col_names = c_names)
-  
+if(!is.null(LOCAL_DATA)) {
+    cmtes = read_delim(paste0(LOCAL_DATA, 'cmtes16.txt'), delim = ',',
+                       quote = '|', col_names = c_names)    
+} else {
+    cmtes = box_read(file_id = '302061819630', read_fun = read_delim, delim = ',',
+                     quote = '|', col_names = c_names)
+}
+ 
 ## only retain year, cmte ID, name, cand ID (or cmte ID if not cand), 
 ## party/pac type
-cmtes = cmtes[, c(1:3, 8, 10)]
+cmtes = select(cmtes, Year, ID, Name, CID, Industry)
   
 # FORMAT CANDS AND CMTES FOR RBIND
 
@@ -82,7 +104,21 @@ cmtes$Party_PAC_Type[substr(cmtes$Party_PAC_Type, 1, 1) %in% c("P", "S", "Y",
                                                                "Z", "R")] = "P"
 
 ## augment missing data with FEC data
-          dir_id = '50855821402')
+if(!is.null(LOCAL_DATA)) {
+    y = read_delim(paste0(LOCAL_DATA, 'cm16_fec.txt'), delim = '|', 
+                   col_names = FALSE)
+} else {
+    y = box_read(file_id = '302056548034', read_fun = read_delim, delim = '|',
+                 col_names = FALSE)
+}
+y$X13 = as.character(y$X13)
+y$X13[y$X13 %in% c("B","T","V","W","C")] = "B"
+y$X13[y$X13=="M"] = "I"
+
+cmtes$Party_PAC_Type <- ifelse(cmtes$Party_PAC_Type == "",
+                               as.character(y$V13[match(cmtes$Actor_ID,y$V1)]),
+                               cmtes$Party_PAC_Type)
+
 
 ##############
 # Add individuals
@@ -96,13 +132,18 @@ c_names = c("Year", "Record_ID", "ID","Name", "RID", "Employer", "Employer_Paren
          "Industry_Ideo", "Date", "Amt", "unknown","City", "State", "Zip", "R_Type", 
          "Tran_Type", "Cmte_ID", "Other_ID", "Gender", "Micro", "Position", 
          "Employer_2", "Source")
-# If file available locally, use this code:
-ind_contribs = read_delim('~/Downloads/indivs16.txt', delim = ',', quote = '|',
-                  col_names = c_names) %>%
-#inds = box_read(file_id = '302063495065', read_fun = read_delim, 
-#                delim = ',', quote = '|', col_names = c_names) %>%
-    mutate(Donor_ID = paste(Name, Zip, sep = '_'))
-inds = ind_contribs %>%
+if(!is.null(LOCAL_DATA)) {
+    inds = read_delim(paste0(LOCAL_DATA, 'indivs16.txt'), delim = ',', 
+                             quote = '|', col_names = c_names)
+} else {
+    inds = box_read(file_id = '302063495065', read_fun = read_delim, 
+                    delim = ',', quote = '|', col_names = c_names)
+}
+# Store copy of the data for later use in edgelist construction
+ind_contribs = inds
+
+inds = inds %>%
+    mutate(Donor_ID = paste(Name, Zip, sep = '_')) %>%
     group_by(Donor_ID) %>%
     summarize(Yr = Year[1],
               Actor_ID = Donor_ID[1],
@@ -140,7 +181,9 @@ inds$Recip_Type = ifelse(is.na(inds$Recip_Type), as.character(vlc$Ent_Typ[match(
 
 #CREATE EL
 #donor, recipient, amt, date, trans type, donor type,recipient type
-inds$Ent_Typ = 'IND'
+inds$Donor_ID<-paste(inds$Name,inds$Zip,sep="_")
+inds$Ent_Typ<-"IND"
+
 indel = select(inds, 'Donor_ID', 'RID', 'Amt', 'Date', 'Tran_Type', 
                'Ent_Typ', 'Recip_Type') %>%
     rename(Recip_ID = RID, Tran_Tp = Tran_Type, Donor_Tp = Ent_Typ, 
@@ -155,9 +198,13 @@ indel = select(inds, 'Donor_ID', 'RID', 'Amt', 'Date', 'Tran_Type',
 # as character
 c_names = c("Year", "Record_ID", "PAC_ID", "Cand_Cmte_ID", "Amt", "Date", 
             "Industry", "Trans_Type", "IE","CID")
-pacs = box_read(file_id = '302150361527', read_fun = read_delim, delim = ',',
-                quote = '|', col_names = c_names)
-
+if(!is.null(LOCAL_DATA)) {
+    pacs = read_delim(paste0(LOCAL_DATA, 'pacs16.txt'), delim = ',', 
+                      quote = '|', col_names = c_names)
+} else {
+    pacs = box_read(file_id = '302150361527', read_fun = read_delim, delim = ',',
+                    quote = '|', col_names = c_names)
+}
 pacs$Ent_Typ = "PAC"
 
 #add data for recipient type
@@ -175,6 +222,8 @@ colnames(pacel) = c("Donor_ID", "Recip_ID", "Amt", "Date", "Tran_Tp",
                     "Donor_Tp", "Recip_Tp")
 
 EL = rbind(pacel, indel)
+EL_old = read_csv('data/EL_16_old.csv')
+
 ## Write files to box in dir 'Strategic_Donors/final_paper_data/'
 box_write(EL, filename = 'EL_16.csv', write_fun = write_csv, 
           dir_id = '50855821402')
