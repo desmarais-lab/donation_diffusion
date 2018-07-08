@@ -164,8 +164,12 @@ vlc = rbind(cands, cmtes, inds)
 vlc = subset(vlc, !duplicated(vlc$Actor_ID))
 
 ## Write files to box in dir 'Strategic_Donors/final_paper_data/'
-box_write(vlc, filename = 'VLC_16.csv', write_fun = write_csv,
-          dir_id = '50855821402')
+if(!is.null(LOCAL_DATA)) {
+    write_csv(vlc, paste0(LOCAL_DATA, 'VLC_16.csv'))
+} else {
+    box_write(vlc, filename = 'VLC_16.csv', write_fun = write_csv,
+              dir_id = '50855821402')
+}
 
 ######################################################
 ###### CREATE EDGE LIST FROM CONTRIBUTION FILES 
@@ -224,6 +228,10 @@ colnames(pacel) = c("Donor_ID", "Recip_ID", "Amt", "Date", "Tran_Tp",
 EL = rbind(pacel, indel)
 EL_old = read_csv('data/EL_16_old.csv')
 
-## Write files to box in dir 'Strategic_Donors/final_paper_data/'
-box_write(EL, filename = 'EL_16.csv', write_fun = write_csv, 
-          dir_id = '50855821402')
+if(!is.null(LOCAL_DATA)) {
+    write_csv(EL, paste0(LOCAL_DATA, 'EL_16.csv'))
+} else {
+    ## Write files to box in dir 'Strategic_Donors/final_paper_data/'
+    box_write(EL, filename = 'EL_16.csv', write_fun = write_csv,
+              dir_id = '50855821402')
+}
