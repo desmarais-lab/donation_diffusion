@@ -5,8 +5,8 @@ library(yaml)
 source('remove_isolates.R')
 
 config = yaml.load_file('0_config.yml')
-LOCAL_DATA = 'data/'
-#LOCAL_DATA = NULL
+#LOCAL_DATA = 'data/'
+LOCAL_DATA = NULL
 
 # Read 'EL_16.csv' from box
 if(!is.null(LOCAL_DATA)) {

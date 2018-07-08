@@ -6,8 +6,8 @@ library(yaml)
 
 init_params = c(1, 1)
 config = yaml.load_file('0_config.yml')
-LOCAL_DATA = 'data/'
-#LOCAL_DATA = NULL
+#LOCAL_DATA = 'data/'
+LOCAL_DATA = NULL
 
 # Read the data prepared for netinf (see 1_make_netinf_data.R) either from 
 # Box or LOCAL_DATA
@@ -61,13 +61,17 @@ while(!convergence) {
     ## Write files to box in dir 'Strategic_Donors/final_paper_data/'
     fname = paste0('netinf_network_threshold_', config$ISOLATE_THRESHOLD,
                    '_pval_', config$P_VALUE, '_iter_', i, '.csv')
-    ref = box_write(network, 
-                    filename = , 
-                    write_fun = write_csv, 
-                    dir_id = '50855821402')
-    i = i + 1
-    ## Store file reference of latest iteration to config (w/o iteration) 
-    fname = paste0('netinf_network_threshold_', config$ISOLATE_THRESHOLD,
-                   '_pval_', config$P_VALUE, '.csv')
-    config[[fname]] = ref
+    if(is.null(LOCAL_DATA)) {
+        ref = box_write(network, 
+                        filename = , 
+                        write_fun = write_csv, 
+                        dir_id = '50855821402')
+        i = i + 1
+        ## Store file reference of latest iteration to config (w/o iteration) 
+        fname = paste0('netinf_network_threshold_', config$ISOLATE_THRESHOLD,
+                       '_pval_', config$P_VALUE, '.csv')
+        config[[fname]] = ref 
+    } else {
+        write_csv(network, paste0(LOCAL_DATA, fname))
+    }
 }
