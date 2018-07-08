@@ -1,12 +1,13 @@
 library(data.table)
 library(boxr)
 library(readr)
+library(yaml)
 
 box_auth()
 
 # Config:
-LOCAL_DATA = 'data/'
-#LOCAL_DATA = NULL
+config = yaml.load_file('0_config.yml')
+LOCAL_DATA = config$LOCAL_DATA
 
 ##################
 ## Cand/PAC Info - create vertex level data
