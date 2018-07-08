@@ -5,9 +5,15 @@ library(yaml)
 source('remove_isolates.R')
 
 config = yaml.load_file('0_config.yml')
+LOCAL_DATA = 'data/'
+#LOCAL_DATA = NULL
 
 # Read 'EL_16.csv' from box
-df = box_read_csv(file_id = '302149820582', fread = TRUE)
+if(!is.null(LOCAL_DATA)) {
+    df = read_csv(paste0(LOCAL_DATA, 'EL_16.csv'))
+} else {
+    df = box_read_csv(file_id = '302149820582', fread = TRUE)
+}
 date_low = as.Date('2015-01-01')
 date_high = as.Date('2017-01-01')
 
@@ -36,10 +42,13 @@ df$integer_date = as.integer(df$Date)
 
 ## Write files to box in dir 'Strategic_Donors/final_paper_data/'
 fname = paste0('data_for_netinf_threshold_', config$ISOLATE_THRESHOLD, '.csv')
-ref = box_write(df, filename = fname, write_fun = write_csv, 
-                dir_id = '50855821402')
-## Store file reference (file_id) in config for downstream scripts
-config[[fname]] = ref$id
-
-## Write config
-write_yaml(config, file = '0_config.yml')
+if(!is.null(LOCAL_DATA)) {
+    write_csv(df, paste0(LOCAL_DATA, fname))
+} else {
+    ref = box_write(df, filename = fname, write_fun = write_csv, 
+                    dir_id = '50855821402')   
+    ## Store file reference (file_id) in config for downstream scripts
+    config[[fname]] = ref$id
+    ## Write config
+    write_yaml(config, file = '0_config.yml')
+}

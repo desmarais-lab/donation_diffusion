@@ -6,14 +6,21 @@ library(yaml)
 
 init_params = c(1, 1)
 config = yaml.load_file('0_config.yml')
+LOCAL_DATA = 'data/'
+#LOCAL_DATA = NULL
 
+# Read the data prepared for netinf (see 1_make_netinf_data.R) either from 
+# Box or LOCAL_DATA
 data_input_file = paste0('data_for_netinf_threshold_', config$ISOLATE_THRESHOLD, 
                          '.csv')
-if(is.null(config[[data_input_file]])) stop('run 1_make_netinf_data.R first.')
-box_auth()
-
-# Read 'data_for_netinf.csv' from box
-df = box_read_csv(file_id = config$data_for_netinf_threshold_8.csv)
+if(!is.null(LOCAL_DATA)) {
+    df = read_csv(paste0(LOCAL_DATA, data_input_file))
+} else {
+    if(is.null(config[[data_input_file]])) stop('run 1_make_netinf_data.R first.')
+    box_auth()
+    # Read 'data_for_netinf.csv' from box
+    df = box_read_csv(file_id = config$data_for_netinf_threshold_8.csv)
+}
 
 # Fit the network
 cascades = as_cascade_long(df, cascade_node_name = 'Donor_ID', 
