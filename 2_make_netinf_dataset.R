@@ -13,6 +13,7 @@ if(!is.null(LOCAL_DATA)) {
 } else {
     df = box_read_csv(file_id = '302149820582', fread = TRUE)
 }
+
 date_low = as.Date('2015-01-01')
 date_high = as.Date('2017-01-01')
 

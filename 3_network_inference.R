@@ -6,8 +6,7 @@ library(yaml)
 
 init_params = c(1, 1)
 config = yaml.load_file('0_config.yml')
-#LOCAL_DATA = 'data/'
-LOCAL_DATA = NULL
+LOCAL_DATA = config$LOCAL_DATA
 
 # Read the data prepared for netinf (see 1_make_netinf_data.R) either from 
 # Box or LOCAL_DATA

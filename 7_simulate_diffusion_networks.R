@@ -5,7 +5,6 @@ library(boxr)
 
 P_VALUE = config$P_VALUE
 THRESHOLD = config$ISOLATE_THRESHOLD
-
 # read in ERGM objects
 box_auth()
 if(P_VALUE == 0.05) {
