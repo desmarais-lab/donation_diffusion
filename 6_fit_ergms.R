@@ -6,21 +6,34 @@ library(fields)
 library(texreg)
 library(ergm)
 library(tidyverse)
+library(yaml)
 library(boxr)
 
-P_VALUE = 0.05
-ISOLATE_THRESHOLD = 8
 box_auth()
+config = yaml.load_file('0_config.yml')
+LOCAL_DATA = config$LOCAL_DATA
 
-# Read the netinf network
-netinf_network = box_read_csv(file_id = '302555400385')
-
-# Read 'data_for_netinf.csv' from box
-df = box_read_csv(file_id = '302229425978')
-
-# Read 'VLC_16_full.csv' from box
-vertex.data = box_read_csv(file_id = '302606866719', fread = TRUE)
-   
+fname = paste0('netinf_network_threshold_', config$ISOLATE_THRESHOLD,
+               '_pval_', config$P_VALUE, '.csv')
+if(!is.null(LOCAL_DATA)) {
+   # Read the netinf network
+   netinf_network = read_csv(paste0(LOCAL_DATA, fname))
+   df = read_csv(paste0(LOCAL_DATA, 'data_for_netinf_threshold', 
+                        config$ISOLATE_THRESHOLD, '.csv'))
+   vertex.data = read_csv(paste0(LOCAL_DATA, 'VLC_16_full.csv'))
+} else {
+    # Read the netinf network
+    netinf_network = box_read_csv(file_id = config[[fname]])
+    # Read 'data_for_netinf'
+    df = box_read_csv(file_id = config[[paste0('data_for_netinf_threshold_',
+                                               config$ISOLATE_THRESHOLD, 
+                                               '.csv')]])
+    # Read 'VLC_16_full.csv' from box
+    ## This is temporary: I couldn't reprocude VCL_16_full.csv so far and it 
+    ## doesn't match VCL_16.csv procuded in 1_...
+    vertex.data = box_read_csv(file_id = '303174011104', fread = TRUE) 
+}
+  
 # Extract vertex id
 vertex.id = as.character(vertex.data$Actor_ID)
 

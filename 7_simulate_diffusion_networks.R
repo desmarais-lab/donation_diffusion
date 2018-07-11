@@ -1,8 +1,10 @@
 # required for simulation
 library(ergm)
+library(yaml)
 library(boxr)
 
-P_VALUE = 0.05
+P_VALUE = config$P_VALUE
+THRESHOLD = config$ISOLATE_THRESHOLD
 
 # read in ERGM objects
 box_auth()

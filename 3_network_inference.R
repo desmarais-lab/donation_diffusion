@@ -70,7 +70,8 @@ while(!convergence) {
         ## Store file reference of latest iteration to config (w/o iteration) 
         fname = paste0('netinf_network_threshold_', config$ISOLATE_THRESHOLD,
                        '_pval_', config$P_VALUE, '.csv')
-        config[[fname]] = ref 
+        config[[fname]] = ref$id
+        write_yaml(config, '0_config.yml')
     } else {
         write_csv(network, paste0(LOCAL_DATA, fname))
     }

@@ -2,4 +2,4 @@ ISOLATE_THRESHOLD: 8
 P_VALUE: 0.05
 LOCAL_DATA: NULL
 data_for_netinf_threshold_8.csv: '302844881600'
-netinf_network_threshold_8_pval_0.05.csv: '302644314208'
+netinf_network_threshold_8_pval_0.05.csv: '302555400385'
