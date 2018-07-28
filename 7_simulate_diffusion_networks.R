@@ -3,16 +3,24 @@ library(ergm)
 library(yaml)
 library(boxr)
 
+config = yaml.load_file('0_config.yml')
+LOCAL_DATA = config$LOCAL_DATA
 P_VALUE = config$P_VALUE
 THRESHOLD = config$ISOLATE_THRESHOLD
+
 # read in ERGM objects
-box_auth()
-if(P_VALUE == 0.05) {
-    # Load 'ergm_results_threshold_8_pval_0.025.RData'
-    box_load(file_id = '302655556413')   
-} else if(P_VALUE == 0.025) {
-    # Load 'ergm_results_threshold_8_pval_0.05.RData'
-    box_load(file_id = '302644314208')
+if(!is.null(LOCAL_DATA)) {
+    fname = paste0('ergm_results_', THRESHOLD, '_pval_', P_VALUE, '.RData')
+    load(paste0(LOCAL_DATA, fname))
+} else {
+    box_auth()
+    if(P_VALUE == 0.05) {
+        # Load 'ergm_results_threshold_8_pval_0.025.RData'
+        box_load(file_id = '302655556413')   
+    } else if(P_VALUE == 0.025) {
+        # Load 'ergm_results_threshold_8_pval_0.05.RData'
+        box_load(file_id = '302644314208')
+    }
 }
 
 set.seed(12345)
@@ -36,6 +44,11 @@ directional.networks <- simulate(ideological.hierarchy.ergm, nsim = 100,
 out = list('spatial.networks' = spatial.networks,
            'directional.networks' = directional.networks)
 
-## Write files to box in dir 'Strategic_Donors/final_paper_data/'
-fname = paste0('ergm_simulation_results_8_pval_', P_VALUE, '.RData')
-box_write(out, filename = fname, dir_id = '50855821402')
+fname = paste0('ergm_simulation_results_', THRESHOLD, '_pval_', P_VALUE, 
+               '.RData')
+if(!is.null(LOCAL_DATA)) {
+    save(out, file = paste0(LOCAL_DATA, fname))
+} else {
+    ## Write to box in dir 'Strategic_Donors/final_paper_data/'
+    box_write(out, filename = fname, dir_id = '50855821402')
+}

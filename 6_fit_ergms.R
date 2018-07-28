@@ -9,7 +9,6 @@ library(tidyverse)
 library(yaml)
 library(boxr)
 
-box_auth()
 config = yaml.load_file('0_config.yml')
 LOCAL_DATA = config$LOCAL_DATA
 
@@ -22,6 +21,7 @@ if(!is.null(LOCAL_DATA)) {
                         config$ISOLATE_THRESHOLD, '.csv'))
    vertex.data = read_csv(paste0(LOCAL_DATA, 'VLC_16_full.csv'))
 } else {
+    box_auth()
     # Read the netinf network
     netinf_network = box_read_csv(file_id = config[[fname]])
     # Read 'data_for_netinf'
@@ -164,7 +164,11 @@ out = list(simple.homophily.ergm = simple.homophily.ergm,
            individual.network.narm = individual.network.narm,
            ideoi = ideoi, ideoj = ideoj, diffun = diffun)
 fname = paste0('ergm_results_', ISOLATE_THRESHOLD, '_pval_', P_VALUE, '.RData')
-box_write(out, filename = fname, dir_id = '50855821402')
+if(!is.null(LOCAL_DATA)) {
+    save(out, file = fname)
+} else {
+    box_write(out, filename = fname, dir_id = '50855821402')
+}
     
 mple.data.full <- ergmMPLE(full.ideology.ergm$formula)
 mple.data.spatial <- ergmMPLE(simple.homophily.ergm$formula)
