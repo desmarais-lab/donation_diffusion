@@ -13,17 +13,19 @@ config = yaml.load_file('0_config.yml')
 LOCAL_DATA = config$LOCAL_DATA
 
 fname = paste0('netinf_network_threshold_', config$ISOLATE_THRESHOLD,
-               '_pval_', config$P_VALUE, '.csv')
+               '.csv')
 if(!is.null(LOCAL_DATA)) {
-   # Read the netinf network
-   netinf_network = read_csv(paste0(LOCAL_DATA, fname))
-   df = read_csv(paste0(LOCAL_DATA, 'data_for_netinf_threshold', 
+    # Read the netinf network
+    load(paste0(LOCAL_DATA, fname))
+    netinf_network = network
+    df = read_csv(paste0(LOCAL_DATA, 'data_for_netinf_threshold_', 
                         config$ISOLATE_THRESHOLD, '.csv'))
-   vertex.data = read_csv(paste0(LOCAL_DATA, 'VLC_16_full.csv'))
+    vertex.data = read_csv(paste0(LOCAL_DATA, 'VLC_16_full.csv'))
 } else {
     box_auth()
     # Read the netinf network
     netinf_network = box_read_csv(file_id = config[[fname]])
+    box_load(file_id = config[[fname]])
     # Read 'data_for_netinf'
     df = box_read_csv(file_id = config[[paste0('data_for_netinf_threshold_',
                                                config$ISOLATE_THRESHOLD, 

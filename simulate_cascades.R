@@ -48,14 +48,15 @@ sim_casc_out_degree = function(diffnet, nsim, params, model, nodes,
 }
 
 # Load required data
-load('../data/casc_sim_data.RData')
-candidates = names(donation_cascades$cascade_nodes)
+load('data/casc_sim_data.RData')
+candidates = names(casc_sim_data$donation_cascades$cascade_nodes)
 start = (job_id - 1) * n_per_job + 1
 end = min(job_id * n_per_job, length(candidates))
 candidates = candidates[start:end]
 
 # Get parameters from the netinf model
-diffmod_params = attr(models[['netinf_network']], 'diffusion_model_parameters')
+diffmod_params = attr(casc_sim_data$models[['netinf_network']], 
+                      'diffusion_model_parameters')
 diffmod = attr(models[['netinf_network']], 'diffusion_model')
 
 n_per_mod = 100

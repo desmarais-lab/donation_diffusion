@@ -25,6 +25,7 @@ if(!is.null(LOCAL_DATA)) {
 cascades = as_cascade_long(df, cascade_node_name = 'Donor_ID', 
                             event_time = 'integer_date', 
                             cascade_id = 'Recip_ID')
+#cascades = subset_cascade(cascades, sample(names(cascades$cascade_nodes), 10))
 df_cascades = data.table(as.data.frame(cascades))
 setkey(df_cascades, "node_name", "cascade_id")
 network = data.frame(origin_node = "", destination_node = "")
@@ -58,20 +59,14 @@ while(!convergence) {
     network = res$network
     # Save current results
     ## Write files to box in dir 'Strategic_Donors/final_paper_data/'
-    fname = paste0('netinf_network_threshold_', config$ISOLATE_THRESHOLD,
-                   '_pval_', config$P_VALUE, '_iter_', i, '.csv')
+    fname = paste0('netinf_network_threshold_', config$ISOLATE_THRESHOLD, 
+                   '.RData')
     if(is.null(LOCAL_DATA)) {
-        ref = box_write(network, 
-                        filename = , 
-                        write_fun = write_csv, 
-                        dir_id = '50855821402')
-        i = i + 1
-        ## Store file reference of latest iteration to config (w/o iteration) 
-        fname = paste0('netinf_network_threshold_', config$ISOLATE_THRESHOLD,
-                       '_pval_', config$P_VALUE, '.csv')
-        config[[fname]] = ref$id
-        write_yaml(config, '0_config.yml')
+        ref = box_save(network, 
+                       file_name = fname, 
+                       dir_id = '50855821402')
     } else {
-        write_csv(network, paste0(LOCAL_DATA, fname))
+        save(network, file = paste0(LOCAL_DATA, fname))
     }
+    i = i + 1
 }
