@@ -11,6 +11,7 @@ library(boxr)
 
 config = yaml.load_file('0_config.yml')
 LOCAL_DATA = config$LOCAL_DATA
+P_VALUE = config$P_VALUE
 
 fname = paste0('netinf_network_threshold_', config$ISOLATE_THRESHOLD,
                '.csv')
@@ -52,8 +53,7 @@ uniqueDonors = unique(df$Donor_ID)
 # throw out vertex data for nodes not included in the network
 net.vertex.data = vertex.data[is.element(vertex.id, uniqueDonors), ]
 nrow(net.vertex.data)/length(uniqueDonors)
-## Some donors are not in the VLC_full dataset (waiting for Zack to give me the 
-## code to recreate that dataset), remove those for now
+
 donor.edgelist = donor.edgelist[donor.edgelist[, 1] %in% net.vertex.data$Actor_ID, ]
 donor.edgelist = donor.edgelist[donor.edgelist[, 2] %in% net.vertex.data$Actor_ID, ]
 
