@@ -81,5 +81,11 @@ if(!is.null(LOCAL_DATA)) {
           dir_id = '50855821402')
 }
 
+# my version 268044155970
+# zack's version 274590374942
+out = arrange(out, Name)
+mine = box_read_csv(file_id = '268044155970') %>% tbl_df() %>% arrange(Name)
+zacks = box_read_csv(file_id = '274590374942') %>% tbl_df() %>% arrange(Name)
+
 
 # This doesn't replicate the sample we sent to catalyst
