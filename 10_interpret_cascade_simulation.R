@@ -7,35 +7,34 @@ library(boxr)
 #devtools::install_github('flinder/flindR')
 pe = flindR::plot_elements()
 
-#SIM_RES_DIR = '../data/cascade_simulation_results/'
-#
-## Load all simulation results
-#
-#outfiles = list.files(SIM_RES_DIR, patter = '*.RData')
-#i = 1
-#for(f in outfiles) {
-#    cat(i, f, '\n')
-#    if(f == 'compiled_results.RData') next
-#    load(paste0('../data/cascade_simulation_results/', f))
-#    if(i == 1) out = do.call(rbind, results)
-#    else out = rbind(out, do.call(rbind, results))
-#    i = i + 1 
-#}
-#
-#simulation_results = tbl_df(out)
-#save(simulation_results, 
-#     file = '../data/cascade_simulation_results/compiled_results.RData')
-#
-#stop()
+SIM_RES_DIR = 'data/cascade_simulation_results/'
 
-load('../data/cascade_simulation_results/compiled_results.RData')
+## Load all simulation results
+
+outfiles = list.files(SIM_RES_DIR, patter = '*.RData')
+i = 1
+for(f in outfiles) {
+    cat(i, f, '\n')
+    if(f == 'compiled_results.RData') next
+    load(paste0('../data/cascade_simulation_results/', f))
+    if(i == 1) out = do.call(rbind, results)
+    else out = rbind(out, do.call(rbind, results))
+    i = i + 1 
+}
+
+simulation_results = tbl_df(out)
+save(simulation_results, 
+     file = '../data/cascade_simulation_results/compiled_results.RData')
+
+stop()
+#load('../data/cascade_simulation_results/compiled_results.RData')
 cutoff_time = 17166
 
 
 # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # Some descriptives on the simulation
 # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-load('../data/casc_sim_data.RData')
+load('data/casc_sim_data.RData')
 
 # Before restriction
 
