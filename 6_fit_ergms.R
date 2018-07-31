@@ -26,7 +26,7 @@ if(!is.null(LOCAL_DATA)) {
 } else {
     box_auth()
     # Read the netinf network
-    box_load(file_id = config[[fname]])
+    box_load(file_id = '307983798270')
     netinf_network = network
     
     df = box_read_csv(file_id = config[[paste0('data_for_netinf_threshold_',
@@ -35,7 +35,7 @@ if(!is.null(LOCAL_DATA)) {
     # Read 'VLC_16_full.csv' from box
     ## This is temporary: I couldn't reprocude VCL_16_full.csv so far and it 
     ## doesn't match VCL_16.csv procuded in 1_...
-    vertex.data = box_read_csv(file_id = '308095557675', read_fun = read_csv) 
+    vertex.data = box_read(file_id = '308095557675', read_fun = read_csv) 
 }
   
 # Extract vertex id
