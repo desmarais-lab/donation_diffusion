@@ -9,13 +9,27 @@ library(boxr)
 library(tidyverse)
 #devtools::install_github('flinder/flindR')
 library(flindR) # For plotting theme
+library(yaml)
 
+config = yaml.load_file('0_config.yml')
+LOCAL_DATA = config$LOCAL_DATA
+P_VALUE = config$P_VALUE
 pe = plot_elements()
-box_auth()
 
-# Load 'Strategic_Donors/2016_data_match/VLC_16_full.csv' from box
-entities = box_read_csv(file_id = '255302928759', fread = TRUE) %>% 
-    tbl_df() 
+if(!is.null(LOCAL_DATA)) {
+    entities = read_csv(paste0(LOCAL_DATA, 'VLC_16_full.csv'))
+    donations = read_csv(paste0(LOCAL_DATA, 'data_for_netinf_threshold_8.csv')) %>% 
+        filter(Donor_Tp == 'IND')
+} else {
+    box_auth()
+    # Load 'Strategic_Donors/VLC_16_full.csv' from box
+    entities = box_read(file_id = '308095557675', read_fun = read_csv)
+    # Load the cascade data 'data_for_netinf_threshold_8.R' from box
+    donations = box_read_csv(file_id = '302844881600', read_fun = read_csv) %>% 
+        filter(Donor_Tp == 'IND')
+         
+}
+
 donors = entities %>%
     filter(Ent_Typ == 'IND', ideology != "") %>%
     select(Actor_ID, ideology)
@@ -24,11 +38,7 @@ candidates = entities %>%
     filter(Ent_Typ == 'CAND') %>%
     select(Actor_ID, Party_PAC_Type, Incum)
 
-# Load the cascade data 'Strategic_Donors/Data/data_for_netinf.R' from box
-donations = box_read_csv(file_id = '292888533329') %>% 
-    tbl_df() %>%
-    filter(Donor_Tp == 'IND')
-    
+   
 
 # Get the normalized rank of each donor with catalyst ideology scores in each 
 # cascade
@@ -76,7 +86,7 @@ ggplot(donations, aes(x = ideology, y = normalized_rank,
     scale_linetype(name = "Recipient\nParty",
                    labels = c("Democrat", "Republican")) +
     facet_wrap(~incumbent)
-ggsave('../paper/figures/donation_rank.png', width = pe$p_width, 
+ggsave('paper/figures/donation_rank.png', width = pe$p_width, 
        height = 0.7 * pe$p_width)
 
 
@@ -92,6 +102,6 @@ ggplot(donations, aes(x = ideology, y = incumbent_b, color = Party_PAC_Type,
     scale_linetype(name = "Recipient\nParty",
                    labels = c("Democrat", "Republican")) +
     pe$theme + ylim(0,1) 
-ggsave('../paper/figures/donor_ideology_candidate_incumbency.png', 
+ggsave('paper/figures/donor_ideology_candidate_incumbency.png', 
        width = pe$p_width, 
        height = 0.7 * pe$p_width)

@@ -12,9 +12,10 @@ library(boxr)
 config = yaml.load_file('0_config.yml')
 LOCAL_DATA = config$LOCAL_DATA
 P_VALUE = config$P_VALUE
+ISOLATE_THRESHOLD = config$ISOLATE_THRESHOLD
 
 fname = paste0('netinf_network_threshold_', config$ISOLATE_THRESHOLD,
-               '.csv')
+               '.RData')
 if(!is.null(LOCAL_DATA)) {
     # Read the netinf network
     load(paste0(LOCAL_DATA, fname))
@@ -25,16 +26,16 @@ if(!is.null(LOCAL_DATA)) {
 } else {
     box_auth()
     # Read the netinf network
-    netinf_network = box_read_csv(file_id = config[[fname]])
     box_load(file_id = config[[fname]])
-    # Read 'data_for_netinf'
+    netinf_network = network
+    
     df = box_read_csv(file_id = config[[paste0('data_for_netinf_threshold_',
                                                config$ISOLATE_THRESHOLD, 
                                                '.csv')]])
     # Read 'VLC_16_full.csv' from box
     ## This is temporary: I couldn't reprocude VCL_16_full.csv so far and it 
     ## doesn't match VCL_16.csv procuded in 1_...
-    vertex.data = box_read_csv(file_id = '303174011104', fread = TRUE) 
+    vertex.data = box_read_csv(file_id = '308095557675', read_fun = read_csv) 
 }
   
 # Extract vertex id
@@ -227,12 +228,13 @@ for(i in 1:length(spatial.ideoi.seq)){
 smooth.empirical <- image.smooth(zmat.empirical,theta=2)
 image.plot(spatial.ideoi.seq,spatial.ideoj.seq,smooth.empirical$z,ylab="Receiver Liberalism",xlab="Sender Liberalism")
 
+pval = gsub('\\.', '_', P_VALUE)
 plot_file1 <- paste0("paper/figures/spatial_model_tieprob_", ISOLATE_THRESHOLD,
-                     "_pval_", P_VALUE, ".pdf")
+                     "_pval_", pval, ".pdf")
 plot_file2 <- paste0("paper/figures/empirical_tieprob_", ISOLATE_THRESHOLD,
-                     "_pval_", P_VALUE, ".pdf")
+                     "_pval_", pval, ".pdf")
 plot_file3 <- paste0("paper/figures/full_model_tieprob_", ISOLATE_THRESHOLD,
-                     "_pval_", P_VALUE, ".pdf")
+                     "_pval_", pval, ".pdf")
 
 pdf(file=plot_file1,height=4.5,width=6)
 par(las=1,mar=c(4,4,1,4))
@@ -252,7 +254,7 @@ image.plot(full.ideoi.seq,full.ideoj.seq,zmat.full,ylab="Receiver Liberalism",xl
 dev.off()
 
 ergm_table_file <- paste0("paper/tables/ergm_results_table_", ISOLATE_THRESHOLD, 
-                          "_pval_", P_VALUE, ".tex")
+                          "_pval_", pval, ".tex")
 ergm.table = texreg(list(full.ideology.ergm, ideological.hierarchy.ergm, 
                           simple.homophily.ergm), digits=4)
 print(ergm.table, file = ergm_table_file)
