@@ -10,18 +10,8 @@ library(grid)
 library(ggpubr)
 
 
-#config = yaml.load_file('0_config.yml')
-config = yaml.load_file('~/donation_diffusion/0_config.yml')
-#LOCAL_DATA = config$LOCAL_DATA
-LOCAL_DATA = "~/Box Sync/Strategic_Donors/final_paper_data/"
-
-#if(!is.null(LOCAL_DATA)) {
-#    random_reply = read_csv(paste0(LOCAL_DATA, 
-#                                   'catalist_random_donors_ideology.csv')) 
-#    active_reply = read_csv(paste0(LOCAL_DATA, 
-#                                   'catalist_active_donor_ideology.csv')) 
-#}
-
+config = yaml.load_file('0_config.yml')
+LOCAL_DATA = config$LOCAL_DATA
 
 
 #Read in vertex level data
@@ -254,6 +244,11 @@ if(!is.null(LOCAL_DATA)) {
 #only those for whom we have Catalist data
 full_samp = subset(vlc,!is.na(vlc$race))
 
+full_samp$partisanship = as.numeric(as.character(full_samp$partisanship))
+
+full_samp$donor_type[full_samp$donor_type=="active"]<-"Active Donors"
+full_samp$donor_type[full_samp$donor_type=="2_4"]<-"Mid-Range Donors"
+full_samp$donor_type[full_samp$donor_type=="1"]<-"One-Off Donors"
 
 #AGE
 age<-as.data.frame(prop.table(table(full_samp$age,full_samp$donor_type),margin=2))
@@ -311,7 +306,7 @@ d<-ggplot(data=ideo,aes(x=Ideology,y=(Percentage*100)))+geom_bar(aes(fill=Type),
 
 
 #RACE (do not plot)
-prop.table(table(tolower(full_samp$race), full_samp$type),margin=2)*100
+prop.table(table(tolower(full_samp$race), full_samp$donor_type),margin=2)*100
 
 
 
@@ -328,7 +323,7 @@ grid_arrange_shared_legend <- function(...) {
     heights = unit.c(unit(1, "npc") - lheight, lheight))
 }
 
-pdf(".../sample_demos_plot_all_donor_categories.pdf",height=8,width=8.5,onefile = F)
+pdf("../paper/figures/sample_demos_plot_all_donor_categories.pdf",height=8,width=8.5,onefile = F)
 grid_arrange_shared_legend(a,b,c,d)
 dev.off()
 
