@@ -28,17 +28,17 @@ set.seed(12345)
 spatial.networks <- simulate(simple.homophily.ergm, nsim = 100, 
                              constraints = ~ edges,
                              control = control.simulate.ergm(
-                                MCMC.interval = 400000,
-                                MCMC.burnin = 80000000)
-                             )
+                                 MCMC.interval = 400000,
+                                 MCMC.burnin = 80000000)
+)
 
 # simulate networks from directional ERGM, take 1000
 directional.networks <- simulate(ideological.hierarchy.ergm, nsim = 100,
                                  constraints = ~ edges,
                                  control=control.simulate.ergm(
-                                    MCMC.interval = 400000,
-                                    MCMC.burnin = 80000000)
-                                 )
+                                     MCMC.interval = 400000,
+                                     MCMC.burnin = 80000000)
+)
 
 # save simulation results
 out = list('spatial.networks' = spatial.networks,

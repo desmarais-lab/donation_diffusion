@@ -9,4 +9,4 @@ db_credentials.py
 *.RData
 *.Rhistory
 casc_sim_*.o*
-*.DS_Store
+.DS_Store

@@ -22,10 +22,11 @@ if(!is.null(LOCAL_DATA)) {
                              'data_for_netinf_threshold_', THRESHOLD, '.csv'))
 } else {
     box_auth()
-    if(P_VALUE == 0.025) box_load(file_id = '302655556413')
-    else box_load(file_id = '302644314208')
-    ergm_sim_out = out
-    actors = box_read_csv(file_id = '303174011104')
+    if(P_VALUE == 0.025) box_load(file_id = '308416233264')
+    #else box_load(file_id = '302644314208')
+    ergm_sim_out = list('spatial.networks' = spatial.networks,
+                        'directional.networks' = directional.networks) 
+    actors = box_read_csv(file_id = '308095557675')
     # Load netinf_network_threshold_THRESHOLD.RData
     box_load(file_id = '307983798270') 
     netinf_network = network
