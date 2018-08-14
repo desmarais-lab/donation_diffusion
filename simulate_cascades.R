@@ -57,19 +57,23 @@ candidates = candidates[start:end]
 # Get parameters from the netinf model
 diffmod_params = attr(casc_sim_data$models[['netinf_network']], 
                       'diffusion_model_parameters')
-diffmod = attr(models[['netinf_network']], 'diffusion_model')
+diffmod = attr(casc_sim_data$models[['netinf_network']], 
+               'diffusion_model')
 
 n_per_mod = 100
 props = c(0.05, 0.1, 0.2)
 results = vector(mode = 'list', 
-                 length = length(candidates) * length(props) * length(models))
+                 length = length(candidates) * length(props) * 
+                          length(casc_sim_data$models))
+
 
 set.seed(8567187)
 j = 1
 for(candidate in candidates) {
     start = Sys.time()
     # Get just the candidate cascade
-    candidate_cascade = subset_cascade(donation_cascades, candidate)
+    candidate_cascade = subset_cascade(casc_sim_data$donation_cascades, 
+                                       candidate)
 
     for(prop in props) {
         
@@ -78,18 +82,19 @@ for(candidate in candidates) {
         #partial_cascade = subset_cascade_n(cascade = candidate_cascade,
         #                                   ns = n_observed)
          
-        for(i in 1:2) {#length(models)) {
-            model_name = names(models)[i]
-            diffnet = models[[i]]
+        for(i in 1:length(casc_sim_data$models)) {#length(models)) {
+            model_name = names(casc_sim_data$models)[i]
+            diffnet = casc_sim_data$models[[i]]
             
             if(model_name == 'netinf_network') {
                 # Simulate 100 iterations from this network
-                out = sim_casc_out_degree(diffnet = diffnet, nsim = n_per_mod, 
-                                          params = diffmod_params, 
-                                          model = diffmod, 
-                                          nodes = donation_cascades$node_names, 
-                                          cand_cascade = candidate_cascade, 
-                                          n_observed = n_observed)
+                out = sim_casc_out_degree(
+                            diffnet = diffnet, nsim = n_per_mod, 
+                            params = diffmod_params, 
+                            model = diffmod, 
+                            nodes = casc_sim_data$donation_cascades$node_names, 
+                            cand_cascade = candidate_cascade, 
+                            n_observed = n_observed)
                 if(!is.null(out)) {
                     out$network_type = model_name
                     out$proportion_observed = prop
@@ -104,7 +109,7 @@ for(candidate in candidates) {
                                             nsim = n_per_mod / length(diffnet), 
                                             params = diffmod_params, 
                                             model = diffmod, 
-                                            nodes = donation_cascades$node_names, 
+                                            nodes = casc_sim_data$donation_cascades$node_names, 
                                             cand_cascade = candidate_cascade, 
                                             n_observed = n_observed)
                     if(!is.null(o)) {
