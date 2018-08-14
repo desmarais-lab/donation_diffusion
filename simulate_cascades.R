@@ -82,12 +82,13 @@ for(candidate in candidates) {
         #partial_cascade = subset_cascade_n(cascade = candidate_cascade,
         #                                   ns = n_observed)
          
-        for(i in 1:length(casc_sim_data$models)) {#length(models)) {
+        for(i in 1:length(casc_sim_data$models)) {
             model_name = names(casc_sim_data$models)[i]
             diffnet = casc_sim_data$models[[i]]
             
             if(model_name == 'netinf_network') {
                 # Simulate 100 iterations from this network
+                class(diffnet) = c('diffnet', 'data.frame')
                 out = sim_casc_out_degree(
                             diffnet = diffnet, nsim = n_per_mod, 
                             params = diffmod_params, 
