@@ -33,8 +33,8 @@ SIM_RES_DIR = 'data/cascade_simulation_results/'
 #
 #stop()
 load('data/cascade_simulation_results/compiled_results.RData')
-cutoff_time = 17166
 
+cutoff_time = 17166
 
 # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # Some descriptives on the simulation
@@ -85,12 +85,23 @@ simulation_cut = group_by(simulation_results, network_type, proportion_observed,
     mutate(rank = row_number()) %>%
     filter(rank < n_donations)
 
+n_don = group_by(simulation_cut, network_type, proportion_observed, 
+                 cascade_id) %>% 
+    summarize(n_donations = n()) %>%
+    group_by(network_type, proportion_observed) %>% 
+    summarize(min = min(n_donations),
+              max = max(n_donations),
+              mena = mean(n_donations),
+              n_sim = length(cascade_id))
+
 # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-# Number of donations by ideology, incumbency, network type and proportion observed
+# Average error in donation rank from simulations from different networks
 # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++   
 
 if(!is.null(LOCAL_DATA)) {
-    nominate_data = read_csv(paste0(LOCAL_DATA, 'nominate_prez_data.csv'))
+    nominate_data = read_csv(paste0(LOCAL_DATA, 'nominate_prez_data.csv')) %>%
+        select(os_id, nominate_dim1) %>%
+        rename(candidate = os_id, ideology = nominate_dim1)
     candidate_meta_data = read_csv(paste0(LOCAL_DATA, 'VLC_16_full.csv')) %>%
         dplyr::select(Actor_ID, Incum) %>%
         rename(candidate = Actor_ID, incumbent = Incum) %>%
@@ -128,8 +139,127 @@ pdat = group_by(matched, network_type, proportion_observed, ideology_bin,
               lo = quantile(prop, 0.025), 
               hi = quantile(prop, 0.975))
 
-## True donation distributon
-dd = as.data.frame(donation_cascades) %>%
+## True donation distributon with normalized donation rank of each donor in 
+## each candidate cascade
+donation_df = as.data.frame(donation_cascades) %>% 
+    tbl_df() %>%
+    group_by(cascade_id) %>%
+    arrange(event_time) %>%
+    mutate(normalized_rank = row_number() / nrow(.)) %>%
+    select(node_name, cascade_id, normalized_rank)
+
+## Get the donation rank of each donor, join with true donation distribution
+## and calculate the error in donation rank
+sim = group_by(simulation_cut, network_type, proportion_observed, cascade_id,
+               candidate) %>%
+    arrange(event_time) %>%
+    mutate(simulated_rank = row_number() / nrow(.)) %>%
+    left_join(donation_df, by = c('node_name' = 'node_name',
+                                  'candidate' = 'cascade_id')) %>%
+    filter(!is.na(normalized_rank)) %>%
+    mutate(rank_error = (simulated_rank - normalized_rank)^2)
+
+ggplot(sim) +
+    geom_histogram(aes(x = rank_error, color = network_type), 
+                   position = 'dodge') +
+    facet_wrap(~proportion_observed) +
+    scale_x_log10() +
+    pe$theme
+
+ci = function(x, bound) {
+    if(bound == 'lower') return(t.test(x)$conf.int[1])
+    else if(bound == 'upper') return(t.test(x)$conf.int[2])
+    else stop('Invalid bound argument')
+}
+
+bs_ci = function(x, quant, B) {
+    bs = function(i, x) {
+        bs_sample = sample(x, length(x), replace = TRUE)
+        return(mean(bs_sample))
+    }
+    means = sapply(1:B, bs, x)
+    return(quantile(means, quant))
+}
+
+pdat = group_by(sim, network_type, proportion_observed) %>%
+    summarize(mean_error = mean(rank_error),
+              lo_normal = ci(rank_error, 'lower'),
+              hi_normal = ci(rank_error, 'upper'),
+              #lo_bs = bs_ci(rank_error, 0.025, 100),
+              #hi_bs = bs_ci(rank_error, 0.975, 100)
+              )
+
+ggplot(pdat, aes(x = proportion_observed)) +
+    geom_segment(aes(xend = proportion_observed, y = lo_normal, yend = hi_normal, 
+                     color = network_type)) + 
+    geom_point(aes(y = mean_error, color = network_type))
+
+#save.image('workspace_cache.RData')
+
+# ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+# Ideological spreading heatmap
+# ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++   
+
+# For each cascade:
+# - create dyads of initial candidates with non-initial candidates
+# - assign them to ideology bins
+# - color heatmap by average time difference
+
+## Join with donor ideology
+sim_don_ideo = read_csv('data/VLC_16_full.csv') %>%
+    filter(Ent_Typ == 'IND', !is.na(ideology)) %>%
+    select(Actor_ID, ideology) %>%
+    rename(donor_ideology = ideology) %>%
+    right_join(simulation_cut, by = c('Actor_ID' = 'node_name')) %>%
+    rename(candidate_ideology = ideology)
+
+
+vals = select(sim_don_ideo, cascade_id, proportion_observed, network_type, 
+              candidate) %>%
+    distinct()
+
+one_sim_grid = function(i) {
+    print(i)
+    x = as.data.frame(vals[i, ])
+    one_sim = filter(sim_don_ideo, cascade_id == x[1, 1], 
+                     proportion_observed == x[1, 2], network_type == x[1, 3], 
+                     candidate == x[1, 4])
+    sim_grid = expand.grid(one_sim$donor_ideology[one_sim$event_time == 0], 
+                one_sim$donor_ideology[one_sim$event_time != 0]) %>% 
+        tbl_df() %>%
+        mutate(init_ideology = as.character(Var1), 
+               recip_ideology = as.character(Var2)) %>%
+        select(-Var1, -Var2) %>%
+        mutate(spread_time = rep(one_sim$event_time[one_sim$event_time != 0],
+                                 each = sum(one_sim$event_time == 0)),
+               cascade_id = x[1, 1], proportion_observed = x[1, 2],
+               network_type = x[1, 3], candidate = x[1, 4])
+    return(sim_grid)
+}
+
+vals = filter(vals, network_type == 'spatial_networks')
+
+library(doParallel)
+cl <- makeCluster(4)
+registerDoParallel(cl)
+sim_grid = foreach(i=1:100, .combine = rbind, .packages = c("dplyr")) %dopar% {
+   one_sim_grid(i) 
+} 
+
+save(sim_grid, file = 'sim_grid.RData')
+
+ggplot(sim_grid) + 
+    geom_tile(aes(x = recip_ideology, y = init_ideology, fill = log(spread_time))) +
+    facet_wrap(~proportion_observed + network_type)
+
+# ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+# Number of donations by ideological bin
+# ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++   
+
+
+
+## Join donation data with candidate metadata
+dd = donation_df %>%
     left_join(nominate_data, by = c('cascade_id' = 'candidate')) %>%
     left_join(candidate_meta_data, by = c('cascade_id' = 'candidate')) %>%
     tbl_df() %>% 
@@ -210,5 +340,5 @@ ggplot(pdat, aes(x = network_type, y = prop, color = incumbent,
     pe$theme + ylab('Proportion') + xlab('Network Type') +
     facet_wrap(~proportion_observed) +
     theme(axis.text.x = element_text(angle = 60, hjust = 1))
-ggsave('../paper/figures/donations_incumbent.png', 
+ggsave('paper/figures/donations_incumbent.png', 
        width = pe$p_width, height = 0.7 * pe$p_width)
