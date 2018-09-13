@@ -1,4 +1,5 @@
 library(tidyverse)
+library(doParallel)
 library(sna)
 library(igraph)
 library(NetworkInference)
@@ -213,14 +214,14 @@ sim_don_ideo = read_csv('data/VLC_16_full.csv') %>%
     right_join(simulation_cut, by = c('Actor_ID' = 'node_name')) %>%
     rename(candidate_ideology = ideology)
 
-
 vals = select(sim_don_ideo, cascade_id, proportion_observed, network_type, 
               candidate) %>%
-    distinct()
+    distinct() 
 
 one_sim_grid = function(i) {
+    s = Sys.time()
     print(i)
-    x = as.data.frame(vals[i, ])
+    x = as.data.frame(samp_vals[i, ])
     one_sim = filter(sim_don_ideo, cascade_id == x[1, 1], 
                      proportion_observed == x[1, 2], network_type == x[1, 3], 
                      candidate == x[1, 4])
@@ -234,15 +235,23 @@ one_sim_grid = function(i) {
                                  each = sum(one_sim$event_time == 0)),
                cascade_id = x[1, 1], proportion_observed = x[1, 2],
                network_type = x[1, 3], candidate = x[1, 4])
+    t = Sys.time() - s
     return(sim_grid)
+    #return(t)
 }
 
-vals = filter(vals, network_type == 'spatial_networks')
 
-library(doParallel)
-cl <- makeCluster(4)
+# sample cascades (candidate-simulations)
+set.seed(562165)
+samp_vals = group_by(vals, network_type, proportion_observed) %>%
+    #summarize(count = n())
+    sample_n(10)
+
+cl <- makeCluster(10)
 registerDoParallel(cl)
-sim_grid = foreach(i=1:100, .combine = rbind, .packages = c("dplyr")) %dopar% {
+sim_grid = foreach(i=1:nrow(samp_vals), 
+                   .combine = rbind, 
+                   .packages = c("dplyr")) %dopar% {
    one_sim_grid(i) 
 } 
 
