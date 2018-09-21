@@ -98,7 +98,8 @@ if(!is.null(LOCAL_DATA)) {
     nominate_data = read_csv(paste0(LOCAL_DATA, 'nominate_prez_data.csv')) %>%
         select(os_id, nominate_dim1) %>%
         rename(candidate = os_id, ideology = nominate_dim1)
-    candidate_meta_data = read_csv(paste0(LOCAL_DATA, 'VLC_16_full.csv')) %>%
+    vlc_16_full = read_csv(paste0(LOCAL_DATA, 'VLC_16_full.csv'))
+    candidate_meta_data = vlc_16_full %>%
         dplyr::select(Actor_ID, Incum) %>%
         rename(candidate = Actor_ID, incumbent = Incum) %>%
         mutate(incumbent = ifelse(incumbent == "I", 1, 0))
@@ -108,7 +109,8 @@ if(!is.null(LOCAL_DATA)) {
         select(os_id, nominate_dim1) %>%
         rename(candidate = os_id, ideology = nominate_dim1)
     # Read 'VLC_16_full.csv' from box
-    candidate_meta_data = box_read_csv(file_id = '308095557675', fread = TRUE) %>%
+    vlc_16_full = box_read_csv(file_id = '308095557675', fread = TRUE)
+    candidate_meta_data = vlc_16_full %>%
         dplyr::select(Actor_ID, Incum) %>%
         rename(candidate = Actor_ID, incumbent = Incum) %>%
         mutate(incumbent = ifelse(incumbent == "I", 1, 0))
@@ -202,7 +204,7 @@ simulation_cut = left_join(simulation_cut, nominate_data) %>%
 # - color heatmap by average time difference
 
 ## Join with donor ideology
-sim_don_ideo = read_csv('data/VLC_16_full.csv') %>%
+sim_don_ideo = vlc_16_full %>%
     filter(Ent_Typ == 'IND', !is.na(ideology)) %>%
     select(Actor_ID, ideology) %>%
     rename(donor_ideology = ideology) %>%
@@ -252,7 +254,7 @@ samp_vals = group_by(vals, network_type, proportion_observed) %>%
     #summarize(count = n())
     sample_n(1000)
 
-cl <- makeCluster(20)
+cl <- makeCluster(10)
 registerDoParallel(cl)
 sim_grid = foreach(i=1:nrow(samp_vals), 
                    .combine = rbind, 
@@ -263,7 +265,7 @@ sim_grid = foreach(i=1:nrow(samp_vals),
 if(!is.null(LOCAL_DATA)) {
     save(sim_grid, file = paste0(LOCAL_DATA, 'sim_grid.RData'))
 } else {
-    box_save(sim_grid, dir_id = '50855821402')
+    box_save(sim_grid, dir_id = '50855821402', file_name = 'sim_grid.RData')
 }
 stop()
 
