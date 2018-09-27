@@ -1,3 +1,4 @@
+library(data.table)
 library(tidyverse)
 library(doParallel)
 library(sna)
@@ -42,42 +43,7 @@ if(!is.null(LOCAL_DATA)) {
     box_load(file_id = '311571533736')
 }
 
-# ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-# Some descriptives on the simulation
-# ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
-# Before restriction
 donation_cascades = casc_sim_data$donation_cascades
-
-## Number of candidates completely dropped
-candidates = names(donation_cascades$cascade_nodes)
-sim_candidates = unique(simulation_results$candidate)
-dropped_candidates = candidates[which(!(candidates %in% sim_candidates))]
-length(dropped_candidates)
-
-## Number of successfull simulations (a simulation is not successfull if the 
-## all seed nodes are isolates)
-n_sims = group_by(simulation_results, network_type, proportion_observed, 
-                   candidate) %>%
-    summarize(count = length(unique(cascade_id))) 
-#ggplot(n_sims, aes(x = count)) +
-#    geom_histogram(color = 'white') +
-#    facet_wrap(~network_type, scales = "free")
-
-#n_sims %>%
-#    group_by(network_type) %>%
-#    summarize(average_n_simulations = mean(count),
-#              median_n_simulations = median(count))
-
-## Average cascade length
-casc_lengths = group_by(simulation_results, network_type, proportion_observed, 
-                        cascade_id, candidate) %>% 
-    summarize(n = n()) %>%
-    group_by(network_type) %>%
-    summarize(average_cascade_length = mean(n),
-              median_cascade_length = median(n))
-
-# After restriction
 
 ## Get total number of observed donations in the data
 n_donations = sum(sapply(donation_cascades$cascade_nodes, length))
@@ -120,80 +86,6 @@ if(!is.null(LOCAL_DATA)) {
 simulation_cut = left_join(simulation_cut, nominate_data) %>%
     left_join(candidate_meta_data)
 
-# Proportion of contributions to each decile of the ideology distribution
-#n_breaks = 30
-#matched = filter(simulation_cut, !is.na(ideology))
-#matched$ideology_bin = cut(matched$ideology, breaks = n_breaks)
-#
-#pdat = group_by(matched, network_type, proportion_observed, ideology_bin, 
-#                cascade_id) %>%
-#    # get the proportion per ideology bin for each simulation iteration
-#    summarize(n = n()) %>%
-#    group_by(network_type, proportion_observed, cascade_id) %>%
-#    mutate(prop = n / n_donations) %>%
-#    ## get mean, lo, hi accross simulation iterations
-#    group_by(network_type, proportion_observed, ideology_bin) %>%
-#    summarize(mean = mean(prop), 
-#              lo = quantile(prop, 0.025), 
-#              hi = quantile(prop, 0.975))
-#
-### True donation distributon with normalized donation rank of each donor in 
-### each candidate cascade
-#donation_df = as.data.frame(donation_cascades) %>% 
-#    tbl_df() %>%
-#    group_by(cascade_id) %>%
-#    arrange(event_time) %>%
-#    mutate(normalized_rank = row_number() / nrow(.)) %>%
-#    select(node_name, cascade_id, normalized_rank)
-#
-### Get the donation rank of each donor, join with true donation distribution
-### and calculate the error in donation rank
-#sim = group_by(simulation_cut, network_type, proportion_observed, cascade_id,
-#               candidate) %>%
-#    arrange(event_time) %>%
-#    mutate(simulated_rank = row_number() / nrow(.)) %>%
-#    left_join(donation_df, by = c('node_name' = 'node_name',
-#                                  'candidate' = 'cascade_id')) %>%
-#    filter(!is.na(normalized_rank)) %>%
-#    mutate(rank_error = (simulated_rank - normalized_rank)^2)
-#
-#ggplot(sim) +
-#    geom_histogram(aes(x = rank_error, color = network_type), 
-#                   position = 'dodge') +
-#    facet_wrap(~proportion_observed) +
-#    scale_x_log10() +
-#    pe$theme
-#
-#ci = function(x, bound) {
-#    if(bound == 'lower') return(t.test(x)$conf.int[1])
-#    else if(bound == 'upper') return(t.test(x)$conf.int[2])
-#    else stop('Invalid bound argument')
-#}
-#
-#bs_ci = function(x, quant, B) {
-#    bs = function(i, x) {
-#        bs_sample = sample(x, length(x), replace = TRUE)
-#        return(mean(bs_sample))
-#    }
-#    means = sapply(1:B, bs, x)
-#    return(quantile(means, quant))
-#}
-#
-#pdat = group_by(sim, network_type, proportion_observed) %>%
-#    summarize(mean_error = mean(rank_error),
-#              lo_normal = ci(rank_error, 'lower'),
-#              hi_normal = ci(rank_error, 'upper'),
-#              #lo_bs = bs_ci(rank_error, 0.025, 100),
-#              #hi_bs = bs_ci(rank_error, 0.975, 100)
-#              )
-#
-#ggplot(pdat, aes(x = proportion_observed)) +
-#    geom_segment(aes(xend = proportion_observed, y = lo_normal, yend = hi_normal, 
-#                     color = network_type)) + 
-#    geom_point(aes(y = mean_error, color = network_type))
-#
-#save.image('workspace_cache.RData')
-
 # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # Ideological spreading heatmap
 # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++   
@@ -203,7 +95,7 @@ simulation_cut = left_join(simulation_cut, nominate_data) %>%
 # - assign them to ideology bins
 # - color heatmap by average time difference
 
-## Join with donor ideology
+# Join with donor ideology
 sim_don_ideo = vlc_16_full %>%
     filter(Ent_Typ == 'IND', !is.na(ideology)) %>%
     select(Actor_ID, ideology) %>%
@@ -227,19 +119,17 @@ one_sim_grid = function(i) {
     # simultaneously occupy the 0th rank).
     nnz = sum(one_sim$event_time != 0)
     one_sim$donation_rank = NA
-    one_sim$donation_rank[one_sim$event_time != 0] = 1:nnz
+    one_sim$donation_rank[one_sim$event_time != 0] = 1:nnz / nnz
     sim_grid = expand.grid(one_sim$donor_ideology[one_sim$event_time == 0], 
                 one_sim$donor_ideology[one_sim$event_time != 0]) %>% 
         tbl_df() %>%
         mutate(init_ideology = as.character(Var1), 
                recip_ideology = as.character(Var2)) %>%
         select(-Var1, -Var2) %>%
-        mutate(spread_time = rep(one_sim$donation_rank[one_sim$event_time !=0],
+        mutate(rank_difference = rep(one_sim$donation_rank[one_sim$event_time !=0],
                                  each = sum(one_sim$event_time == 0)),
-               # uncomment this if not ranks but actual spread times are 
-               #required
-               #spread_time = rep(one_sim$event_time[one_sim$event_time != 0],
-               #                  each = sum(one_sim$event_time == 0)),
+               spread_time = rep(one_sim$event_time[one_sim$event_time != 0],
+                                 each = sum(one_sim$event_time == 0)),
                cascade_id = x[1, 1], proportion_observed = x[1, 2],
                network_type = x[1, 3], candidate = x[1, 4])
     t = Sys.time() - s
@@ -254,7 +144,7 @@ samp_vals = group_by(vals, network_type, proportion_observed) %>%
     #summarize(count = n())
     sample_n(1000)
 
-cl <- makeCluster(10)
+cl <- makeCluster(12)
 registerDoParallel(cl)
 sim_grid = foreach(i=1:nrow(samp_vals), 
                    .combine = rbind, 
@@ -270,30 +160,40 @@ if(!is.null(LOCAL_DATA)) {
 stop()
 
 if(!is.null(LOCAL_DATA)) {
-    load(paste0(LOCAL_DATA, 'sim_grid.RData'))
+    load(paste0(LOCAL_DATA, 'sim_grid_backup.RData'))
 } else {
     box_load(file_id = '318951870681')
 }
 
-library(data.table)
+#old simulation output with actual spreading times
+box_load(file_id = '318951870681')
+
 # Convert to data.table without copy
 setDT(sim_grid)
-sim_grid_sample = na.omit(sim_grid[sample(.N, 1000)])
+pdat = sim_grid[network_type %in% c('directional_networks', 
+                                    'spatial_networks'), 
+                mean(spread_time), by = c('init_ideology', 'recip_ideology',
+                                         'proportion_observed', 
+                                         'network_type')]
 
 # Sort the (character) ideology bins by their numeric value
 levs = unique(c(sim_grid_sample$init_ideology, sim_grid_sample$recip_ideology))
 re_ordered = levs[order(as.numeric(sapply(strsplit(levs, '–'), 
                                           function(x) return(x[1]))))]
 
+display_labs = re_ordered[c(1, 5, 10, 15, 20)]
 
-
-
-ggplot(sim_grid_sample) + 
+ggplot(na.omit(pdat)) + 
     geom_tile(aes(x = factor(recip_ideology, levels = re_ordered), 
                   y = factor(init_ideology, levels = re_ordered), 
-                  fill = spread_time)) +
-    scale_fill_gradient2() +
-    facet_wrap(~proportion_observed + network_type)
+                  fill = V1)) +
+    scale_fill_gradientn(colors = rev(rainbow(7)[-7])) +
+    scale_x_discrete(breaks = display_labs, labels = display_labs) +
+    scale_y_discrete(breaks = display_labs, labels = display_labs) +
+    labs(fill='Spread\nTime') +
+    ylab('Initial Donor Ideology') + xlab('Receiving Donor Ideology') +
+    facet_wrap(~proportion_observed + network_type, ncol = 2) +
+    rotate_labels(30)
 
 
 # Get an upper bound from the simulated networks directly
@@ -457,3 +357,14 @@ ggplot(pdat, aes(x = network_type, y = prop, color = incumbent,
     theme(axis.text.x = element_text(angle = 60, hjust = 1))
 ggsave('paper/figures/donations_incumbent.png', 
        width = pe$p_width, height = 0.7 * pe$p_width)
+
+
+
+
+
+
+test = data.frame(a = rep(c(1,1,1,2,2,2,3,3,3), 2),
+                  b = rep(c(1,2,3,1,2,3,1,2,3), 2),
+                  v = rnorm(18))
+p = ggplot(test) + 
+    geom_tile(aes(x = a, y = b, fill = v))
