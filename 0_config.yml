@@ -1,4 +1,4 @@
 ISOLATE_THRESHOLD: 8
 P_VALUE: 0.025
 LOCAL_DATA: data/
-data_for_netinf_threshold_8.csv: '302844881600'
+FIGURES_PATH: paper/figures/
