@@ -4,7 +4,7 @@ library(NetworkInference)
 library(boxr)
 library(yaml)
 
-init_params = c(1, 1)
+params = c(1, 1)
 config = yaml.load_file('0_config.yml')
 LOCAL_DATA = config$LOCAL_DATA
 
@@ -33,7 +33,7 @@ convergence = FALSE
 i = 1
 while(!convergence) {
     cat("Iteration", i, "\n")
-    res = netinf(cascades, trans_mod = 'log-normal', params = init_params,
+    res = netinf(cascades, trans_mod = 'log-normal', params = params,
                  p_value_cutoff = 0.05, trees = TRUE)
     trees_df = data.table(res$trees) 
     
@@ -60,7 +60,7 @@ while(!convergence) {
     # Save current results
     ## Write files to box in dir 'Strategic_Donors/final_paper_data/'
     fname = paste0('netinf_network_threshold_', config$ISOLATE_THRESHOLD, 
-                   '.RData')
+                   '_bugfix.RData')
     if(is.null(LOCAL_DATA)) {
         ref = box_save(network, 
                        file_name = fname, 
