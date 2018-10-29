@@ -15,7 +15,7 @@ P_VALUE = config$P_VALUE
 ISOLATE_THRESHOLD = config$ISOLATE_THRESHOLD
 
 fname = paste0('netinf_network_threshold_', config$ISOLATE_THRESHOLD,
-               '.RData')
+               '_bugfix.RData')
 if(!is.null(LOCAL_DATA)) {
     # Read the netinf network
     load(paste0(LOCAL_DATA, fname))
@@ -28,7 +28,7 @@ if(!is.null(LOCAL_DATA)) {
     # Read the netinf network
     box_load(file_id = '336545819172')
     netinf_network = network
-    
+ 
     df = box_read_csv(file_id = '302844881600')
     # Read 'VLC_16_full.csv' from box
     ## This is temporary: I couldn't reprocude VCL_16_full.csv so far and it 
