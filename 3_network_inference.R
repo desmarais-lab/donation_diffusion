@@ -4,7 +4,6 @@ library(NetworkInference)
 library(boxr)
 library(yaml)
 
-params = c(1, 1)
 config = yaml.load_file('0_config.yml')
 LOCAL_DATA = config$LOCAL_DATA
 
@@ -15,10 +14,9 @@ data_input_file = paste0('data_for_netinf_threshold_', config$ISOLATE_THRESHOLD,
 if(!is.null(LOCAL_DATA)) {
     df = read_csv(paste0(LOCAL_DATA, data_input_file))
 } else {
-    if(is.null(config[[data_input_file]])) stop('run 1_make_netinf_data.R first.')
     box_auth()
     # Read 'data_for_netinf.csv' from box
-    df = box_read_csv(file_id = config$data_for_netinf_threshold_8.csv)
+    df = box_read_csv(file_id = '302844881600')
 }
 
 # Fit the network
@@ -28,7 +26,10 @@ cascades = as_cascade_long(df, cascade_node_name = 'Donor_ID',
 #cascades = subset_cascade(cascades, sample(names(cascades$cascade_nodes), 10))
 df_cascades = data.table(as.data.frame(cascades))
 setkey(df_cascades, "node_name", "cascade_id")
+
+params = c(3.991063, 1.640515)
 network = data.frame(origin_node = "", destination_node = "")
+
 convergence = FALSE
 i = 1
 while(!convergence) {

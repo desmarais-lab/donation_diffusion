@@ -26,12 +26,10 @@ if(!is.null(LOCAL_DATA)) {
 } else {
     box_auth()
     # Read the netinf network
-    box_load(file_id = '307983798270')
+    box_load(file_id = '336545819172')
     netinf_network = network
     
-    df = box_read_csv(file_id = config[[paste0('data_for_netinf_threshold_',
-                                               config$ISOLATE_THRESHOLD, 
-                                               '.csv')]])
+    df = box_read_csv(file_id = '302844881600')
     # Read 'VLC_16_full.csv' from box
     ## This is temporary: I couldn't reprocude VCL_16_full.csv so far and it 
     ## doesn't match VCL_16.csv procuded in 1_...
