@@ -15,11 +15,11 @@ if(!is.null(LOCAL_DATA)) {
 } else {
     box_auth()
     if(P_VALUE == 0.05) {
-        # Load 'ergm_results_threshold_8_pval_0.025.RData'
-        box_load(file_id = '302655556413')   
-    } else if(P_VALUE == 0.025) {
         # Load 'ergm_results_threshold_8_pval_0.05.RData'
-        box_load(file_id = '302644314208')
+        box_load(file_id = '') # TODO: Run ergms with 0.05
+    } else if(P_VALUE == 0.025) {
+        # Load 'ergm_results_threshold_8_pval_0.025.RData'
+        box_load(file_id = '308416663144')     
     }
 }
 
