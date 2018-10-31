@@ -27,11 +27,11 @@ if(!is.null(LOCAL_DATA)) {
     ergm_sim_out = list('spatial.networks' = spatial.networks,
                         'directional.networks' = directional.networks) 
     actors = box_read_csv(file_id = '308095557675')
-    # Load netinf_network_threshold_THRESHOLD.RData
-    box_load(file_id = '307983798270') 
+    # Load netinf_network_threshold_8_bugfix.RData
+    box_load(file_id = '336545819172') 
     netinf_network = network
-    donation_data = box_read_csv(
-        file_id = config$data_for_netinf_threshold_8.csv)
+    # Load data_for_netinf_threshold_8.csv
+    donation_data = box_read_csv(file_id = '302844881600')
 }
 
 ## Remove non individual donors and donors without covariates
@@ -76,5 +76,6 @@ casc_sim_data = list(models = models,
 if(!is.null(LOCAL_DATA)) {
     save(casc_sim_data, file = paste0(LOCAL_DATA, 'casc_sim_data.RData'))
 } else {
-    box_save(casc_sim_data, dir_id = '50855821402') 
+    box_save(casc_sim_data, dir_id = '50855821402',
+             file_name = 'casc_sim_data.RData') 
 }
