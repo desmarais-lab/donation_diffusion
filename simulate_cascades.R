@@ -1,6 +1,10 @@
 #devtools::install_github('desmarais-lab/NetworkInference')
 library(NetworkInference)
 library(tidyverse)
+library(boxr)
+
+config = yaml.load_file('0_config.yml')
+LOCAL_DATA = config$LOCAL_DATA
 
 job_id = as.integer(commandArgs(trailingOnly = TRUE)[1])
 n_per_job = as.integer(commandArgs(trailingOnly = TRUE)[2])
@@ -48,7 +52,9 @@ sim_casc_out_degree = function(diffnet, nsim, params, model, nodes,
 }
 
 # Load required data
-load('data/casc_sim_data.RData')
+if(is.null(LOCAL_DATA)) load('data/casc_sim_data.RData')
+else box_load(file_id = '311571533736')
+
 candidates = names(casc_sim_data$donation_cascades$cascade_nodes)
 start = (job_id - 1) * n_per_job + 1
 end = min(job_id * n_per_job, length(candidates))
