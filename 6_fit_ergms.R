@@ -118,6 +118,7 @@ diffun <- function(i,j){
 
 ### Estimate the ERGMs
 set.seed(123)
+cntrl = control.ergm(MCMC.samplesize = 50000,MCMC.interval=10000)
 mod = individual.network.narm ~ mutual + 
                                 transitiveties +
                                 gwidegree(0.5,fixed=T) + 
@@ -128,8 +129,7 @@ mod = individual.network.narm ~ mutual +
                                 edgecov(abs(ideoi-ideoj)) + 
                                 edgecov(ideoi) + 
                                 edgecov(ideoj)
-simple.homophily.ergm = ergm(mod, 
-                             control = control.ergm(MCMC.samplesize = 10000))
+simple.homophily.ergm = ergm(mod, control = cntrl)
 
 set.seed(1234)
 mod = individual.network.narm ~ mutual + 
@@ -142,8 +142,7 @@ mod = individual.network.narm ~ mutual +
                                 edgecov(eval(diffun(ideoi,ideoj))) + 
                                 edgecov(ideoi) + 
                                 edgecov(ideoj)
-ideological.hierarchy.ergm = ergm(mod, 
-                                  control = control.ergm(MCMC.samplesize = 10000))
+ideological.hierarchy.ergm = ergm(mod, control = cntrl)
 
 set.seed(123)
 mod = individual.network.narm ~ mutual + 
@@ -156,7 +155,7 @@ mod = individual.network.narm ~ mutual +
                                 edgecov(ideoi) + 
                                 edgecov(ideoj) + 
                                 edgecov(eval(diffun(ideoi,ideoj)))
-full.ideology.ergm = ergm(mod, control = control.ergm(MCMC.samplesize = 10000))
+full.ideology.ergm = ergm(mod, control = cntrl)
 
 ## Write files to box in dir 'Strategic_Donors/final_paper_data/'
 out = list(simple.homophily.ergm = simple.homophily.ergm, 
