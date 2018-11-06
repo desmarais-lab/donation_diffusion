@@ -52,7 +52,10 @@ sim_casc_out_degree = function(diffnet, nsim, params, model, nodes,
 }
 
 # Load required data
-if(is.null(LOCAL_DATA)) load('data/casc_sim_data.RData')
+if(is.null(LOCAL_DATA)) {
+    box_auth()
+    load('data/casc_sim_data.RData')
+}
 else box_load(file_id = '311571533736')
 
 candidates = names(casc_sim_data$donation_cascades$cascade_nodes)
