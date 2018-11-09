@@ -5,6 +5,8 @@
 {queue}
 
 cd $PBS_O_WORKDIR
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/opt/aci/sw/python/3.6.3_anaconda-5.0.1/lib
+module load  gcc/5.3.1 openmpi
 Rscript simulate_cascades.R {job_id} {n_per_job}
 
 # bbd5087_a_g_hc_default (40 cores)

@@ -2,6 +2,7 @@
 library(NetworkInference)
 library(tidyverse)
 library(boxr)
+library(yaml)
 
 config = yaml.load_file('0_config.yml')
 LOCAL_DATA = config$LOCAL_DATA
@@ -55,8 +56,9 @@ sim_casc_out_degree = function(diffnet, nsim, params, model, nodes,
 if(is.null(LOCAL_DATA)) {
     box_auth()
     load('data/casc_sim_data.RData')
+} else {
+    box_load(file_id = '311571533736')
 }
-else box_load(file_id = '311571533736')
 
 candidates = names(casc_sim_data$donation_cascades$cascade_nodes)
 start = (job_id - 1) * n_per_job + 1
