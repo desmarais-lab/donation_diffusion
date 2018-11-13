@@ -31,15 +31,15 @@ pe = flindR::plot_elements()
 #
 #simulation_results = tbl_df(out)
 #save(simulation_results, 
-#     file = 'data/cascade_simulation_results/compiled_results.RData')
+#     file = 'data/compiled_results.RData')
 #
 #stop()
 if(!is.null(LOCAL_DATA)) {
-    load(paste0(LOCAL_DATA, 'cascade_simulation_results/compiled_results.RData'))
+    load(paste0(LOCAL_DATA, 'compiled_results.RData'))
     load(paste0(LOCAL_DATA, 'casc_sim_data.RData'))
 } else {
     box_auth()
-    box_load(file_id = '311588038097')
+    box_load(file_id = '349405551106')
     box_load(file_id = '311571533736')
 }
 
@@ -180,6 +180,7 @@ p = ggplot(pdat, aes(x = seed_extremeness, y = nonseed_extremeness)) +
     pe$theme +
     xlab('Mean seed extremeness') +
     ylab('Mean non-seed extremeness')
+p
 ggsave(
     p,
     file = paste0(FIGURES_PATH, 'simresults_mean_nonseeds.png'),
@@ -207,6 +208,7 @@ p = ggplot(pdat, aes(x = seed_extremeness, y = nonseed_moderates)) +
     pe$theme +
     xlab('Mean seed extremeness') +
     ylab('Proportion non-seed moderates')
+p
 ggsave(
     p,
     file = paste0(FIGURES_PATH, 'simresults_moderates_nonseeds.png'),
