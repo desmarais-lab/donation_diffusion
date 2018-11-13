@@ -10,13 +10,14 @@ library(fANCOVA)
 
 config = yaml.load_file('0_config.yml')
 LOCAL_DATA = config$LOCAL_DATA
+if(!is.null(LOCAL_DATA)) box_auth()
 FIGURES_PATH = config$FIGURES_PATH
 
 #devtools::install_github('flinder/flindR')
 pe = flindR::plot_elements()
 
-## Load all simulation results
-
+### Load all simulation results
+### Note this only runs locally on the HPC for now
 #SIM_RES_DIR = 'data/cascade_simulation_results/'
 #outfiles = list.files(SIM_RES_DIR, patter = '*.RData')
 #i = 1
@@ -30,15 +31,19 @@ pe = flindR::plot_elements()
 #}
 #
 #simulation_results = tbl_df(out)
-#save(simulation_results, 
-#     file = 'data/compiled_results.RData')
-#
+#if(!is.null(LOCAL_DATA)) {
+#    save(simulation_results, 
+#    file = 'data/compiled_results.RData')
+#} else {
+#    box_save(simulation_results, dir_id = '50855821402', 
+#             file_name = 'compiled_results.RData')
+#}
 #stop()
+
 if(!is.null(LOCAL_DATA)) {
     load(paste0(LOCAL_DATA, 'compiled_results.RData'))
     load(paste0(LOCAL_DATA, 'casc_sim_data.RData'))
 } else {
-    box_auth()
     box_load(file_id = '349405551106')
     box_load(file_id = '311571533736')
 }
@@ -70,7 +75,6 @@ if(!is.null(LOCAL_DATA)) {
         rename(candidate = Actor_ID, incumbent = Incum) %>%
         mutate(incumbent = ifelse(incumbent == "I", 1, 0))
 } else {
-    box_auth()
     nominate_data = box_read_csv(file_id = '311590876251') %>%
         select(os_id, nominate_dim1) %>%
         rename(candidate = os_id, ideology = nominate_dim1)

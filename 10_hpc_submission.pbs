@@ -1,0 +1,11 @@
+#PBS -l nodes=1:ppn=1
+#PBS -l walltime=24:00:00
+#PBS -l pmem=16gb
+#PBS -j oe
+#PBS -A bbd5087_b_g_sc_default 
+#PBS -M fridolin.linder@nyu.edu
+
+cd $PBS_O_WORKDIR
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/opt/aci/sw/python/3.6.3_anaconda-5.0.1/lib
+module load  gcc/5.3.1 openmpi
+Rscript 10_interpret_cascade_simulation.R
