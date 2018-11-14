@@ -1,5 +1,5 @@
 # This script generates analyses that are based directly on the raw donation
-# data:
+# data. And some descriptives based on the inferred diffusion network
 #
 # - Figure of normalized donation rank by donor ideology and recipient party
 # - Figure of proportion of donations to incumbent/non-incument by donor 
@@ -10,11 +10,14 @@ library(tidyverse)
 #devtools::install_github('flinder/flindR')
 library(flindR) # For plotting theme
 library(yaml)
+library(xtable)
 
 config = yaml.load_file('0_config.yml')
 LOCAL_DATA = config$LOCAL_DATA
 P_VALUE = config$P_VALUE
 pe = plot_elements()
+TABLE_DIR = 'paper/tables/'
+FIG_DIR = 'paper/figures/'
 
 if(!is.null(LOCAL_DATA)) {
     entities = read_csv(paste0(LOCAL_DATA, 'VLC_16_full.csv'))
@@ -25,9 +28,10 @@ if(!is.null(LOCAL_DATA)) {
     # Load 'Strategic_Donors/VLC_16_full.csv' from box
     entities = box_read(file_id = '308095557675', read_fun = read_csv)
     # Load the cascade data 'data_for_netinf_threshold_8.R' from box
-    donations = box_read_csv(file_id = '302844881600', read_fun = read_csv) %>% 
+    donations = box_read_csv(file_id = '302844881600') %>% 
         filter(Donor_Tp == 'IND')
-         
+    # Load netinf_network_threshold_8_bugfix.RData (object named 'network')
+    box_load(file_id = '336545819172')
 }
 
 donors = entities %>%
@@ -86,7 +90,7 @@ ggplot(donations, aes(x = ideology, y = normalized_rank,
     scale_linetype(name = "Recipient\nParty",
                    labels = c("Democrat", "Republican")) +
     facet_wrap(~incumbent)
-ggsave('paper/figures/donation_rank.png', width = pe$p_width, 
+ggsave(paste0(FIG_DIR, 'donation_rank.png'), width = pe$p_width, 
        height = 0.7 * pe$p_width)
 
 
@@ -102,6 +106,25 @@ ggplot(donations, aes(x = ideology, y = incumbent_b, color = Party_PAC_Type,
     scale_linetype(name = "Recipient\nParty",
                    labels = c("Democrat", "Republican")) +
     pe$theme + ylim(0,1) 
-ggsave('paper/figures/donor_ideology_candidate_incumbency.png', 
+ggsave(paste0(FIG_DIR, 'donor_ideology_candidate_incumbency.png'), 
        width = pe$p_width, 
        height = 0.7 * pe$p_width)
+
+### Get some descriptives of the donors in the network
+ent_type = select(entities, Actor_ID, Ent_Typ)
+network = left_join(network, ent_type, by = c("origin_node" = "Actor_ID")) %>%
+    rename(origin_entity_type = Ent_Typ) %>%
+    left_join(ent_type, by = c('destination_node' = 'Actor_ID')) %>%
+    rename(destination_entity_type = Ent_Typ)
+
+tab = group_by(na.omit(network), origin_entity_type, destination_entity_type) %>%
+    summarize(Count = n(),
+              Proportion = round(n() / nrow(network), 2)) %>%
+    rename(Origin = origin_entity_type, 
+           Destination = destination_entity_type)
+    
+tab$Origin[tab$Origin == 'IND'] = "Individual"
+tab$Destination[tab$Destination == 'IND'] = "Individual"
+print(xtable(tab, caption = "Tie types in the inferred diffusion network.", 
+             label = 'tab:tie_types'),
+      file = paste0(TABLE_DIR, 'tie_types.tex'), include.rownames = FALSE)
