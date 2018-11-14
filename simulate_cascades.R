@@ -6,6 +6,9 @@ library(yaml)
 
 config = yaml.load_file('0_config.yml')
 LOCAL_DATA = config$LOCAL_DATA
+OUT_DIR = 'data/cascade_simulation_results/'
+# Box id for OUT_DIR
+OUT_DIR_ID = '58248399634'
 
 job_id = as.integer(commandArgs(trailingOnly = TRUE)[1])
 n_per_job = as.integer(commandArgs(trailingOnly = TRUE)[2])
@@ -53,10 +56,10 @@ sim_casc_out_degree = function(diffnet, nsim, params, model, nodes,
 }
 
 # Load required data
-if(is.null(LOCAL_DATA)) {
-    box_auth()
+if(!is.null(LOCAL_DATA)) {
     load('data/casc_sim_data.RData')
 } else {
+    box_auth()
     box_load(file_id = '311571533736')
 }
 
@@ -147,5 +150,9 @@ for(candidate in candidates) {
     cat('Timing for candidate', candidate, ':', Sys.time() - start, '\n')
 }
 
-fname = paste0('data/cascade_simulation_results/simulated_cascades_', job_id, '.RData')
-save(results, file = fname)
+fname = paste0('simulated_cascades_', job_id, '.RData')
+if(!is.null(LOCAL_DATA)) {
+    save(results, file = paste0(OUT_DIR, fname)
+} else {
+    box_save(results, dir_id = OUT_DIR_ID, file_name = fname)
+}
