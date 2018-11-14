@@ -44,6 +44,7 @@ if(!is.null(LOCAL_DATA)) {
     load(paste0(LOCAL_DATA, 'compiled_results.RData'))
     load(paste0(LOCAL_DATA, 'casc_sim_data.RData'))
 } else {
+    box_auth()
     box_load(file_id = '349405551106')
     box_load(file_id = '311571533736')
 }
